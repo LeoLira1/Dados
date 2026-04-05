@@ -4,10 +4,14 @@ import os
 from datetime import date
 
 import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
 
 from src.data_store import MeasurementRepository
+
+try:
+    import plotly.graph_objects as go
+except ModuleNotFoundError:
+    go = None
 
 try:
     from anthropic import Anthropic
@@ -16,6 +20,11 @@ except Exception:  # pacote opcional em runtime
 
 
 st.set_page_config(page_title="Composição Corporal · Alfred", layout="wide")
+
+if go is None:
+    st.warning(
+        "Plotly não está instalado neste ambiente. Exibindo gráficos simplificados para manter o app funcional."
+    )
 
 repo = MeasurementRepository()
 rows = repo.list_measurements()
@@ -50,33 +59,49 @@ with m2:
     st.progress(max(0, min(100, int(progress_fat))) / 100)
     st.write(f"Atual: **{current.body_fat_pct:.1f}%** · Meta: **{fat_goal:.1f}%**")
 
-fig = go.Figure()
-fig.add_trace(go.Scatter(x=df["measured_at"], y=df["weight_kg"], name="Peso (kg)", mode="lines+markers"))
-fig.add_trace(go.Scatter(x=df["measured_at"], y=df["body_fat_pct"], name="Gordura (%)", mode="lines+markers", yaxis="y2"))
-fig.add_trace(go.Scatter(x=df["measured_at"], y=df["muscle_kg"], name="Músculo (kg)", mode="lines+markers"))
-fig.add_hline(y=weight_goal, line_dash="dash", annotation_text="Meta Peso")
-fig.update_layout(
-    height=430,
-    legend=dict(orientation="h"),
-    yaxis=dict(title="kg"),
-    yaxis2=dict(title="% gordura", overlaying="y", side="right"),
-)
-st.plotly_chart(fig, use_container_width=True)
+if go is not None:
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=df["measured_at"], y=df["weight_kg"], name="Peso (kg)", mode="lines+markers"))
+    fig.add_trace(
+        go.Scatter(x=df["measured_at"], y=df["body_fat_pct"], name="Gordura (%)", mode="lines+markers", yaxis="y2")
+    )
+    fig.add_trace(go.Scatter(x=df["measured_at"], y=df["muscle_kg"], name="Músculo (kg)", mode="lines+markers"))
+    fig.add_hline(y=weight_goal, line_dash="dash", annotation_text="Meta Peso")
+    fig.update_layout(
+        height=430,
+        legend=dict(orientation="h"),
+        yaxis=dict(title="kg"),
+        yaxis2=dict(title="% gordura", overlaying="y", side="right"),
+    )
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.subheader("Evolução temporal (modo simplificado)")
+    chart_df = df.set_index("measured_at")[["weight_kg", "body_fat_pct", "muscle_kg"]]
+    st.line_chart(chart_df, use_container_width=True)
 
 c1, c2 = st.columns(2)
 with c1:
     st.subheader("Composição hoje")
     fat_kg = current.weight_kg * (current.body_fat_pct / 100)
     other_kg = current.weight_kg - current.muscle_kg - fat_kg
-    donut = go.Figure(
-        go.Pie(
-            labels=["Músculo", "Gordura", "Outros"],
-            values=[current.muscle_kg, fat_kg, max(other_kg, 0)],
-            hole=0.65,
-        )
+    composition_df = pd.DataFrame(
+        {
+            "componente": ["Músculo", "Gordura", "Outros"],
+            "kg": [current.muscle_kg, fat_kg, max(other_kg, 0)],
+        }
     )
-    donut.update_layout(height=350)
-    st.plotly_chart(donut, use_container_width=True)
+    if go is not None:
+        donut = go.Figure(
+            go.Pie(
+                labels=composition_df["componente"],
+                values=composition_df["kg"],
+                hole=0.65,
+            )
+        )
+        donut.update_layout(height=350)
+        st.plotly_chart(donut, use_container_width=True)
+    else:
+        st.bar_chart(composition_df.set_index("componente"), use_container_width=True)
 with c2:
     st.subheader("Histórico")
     st.dataframe(
