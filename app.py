@@ -3,6 +3,8 @@ import base64
 import html
 import json
 import mimetypes
+import re
+import requests
 from datetime import date, timedelta
 
 import anthropic
@@ -384,6 +386,123 @@ def init_nutri_db():
     conn.commit()
 
 
+def init_atividade_db():
+    conn = get_turso_conn()
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS atividade_diaria (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data_log TEXT,
+            calorias_ativas REAL,
+            passos INTEGER,
+            minutos_movimento INTEGER,
+            origem TEXT DEFAULT 'manual',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    conn.commit()
+
+
+def save_atividade_log(data_log, calorias_ativas, passos, minutos_movimento, origem="ocr"):
+    conn = get_turso_conn()
+    conn.execute(
+        """
+        INSERT INTO atividade_diaria
+            (data_log, calorias_ativas, passos, minutos_movimento, origem)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        [data_log, calorias_ativas, passos, minutos_movimento, origem],
+    )
+    conn.commit()
+
+
+def load_atividade_df() -> pd.DataFrame:
+    conn = get_turso_conn()
+    rows = conn.execute(
+        """
+        SELECT data_log, calorias_ativas, passos, minutos_movimento, origem
+        FROM atividade_diaria
+        ORDER BY date(data_log) DESC
+        LIMIT 30
+        """
+    ).fetchall()
+    if not rows:
+        return pd.DataFrame()
+    cols = ["data_log", "calorias_ativas", "passos", "minutos_movimento", "origem"]
+    df = pd.DataFrame(rows, columns=cols)
+    df["data_log"] = pd.to_datetime(df["data_log"], errors="coerce")
+    return df
+
+
+# ── OCR.space ─────────────────────────────────────────────────────────────────
+def extrair_mifitness_ocr(uploaded_file) -> dict:
+    """
+    Envia imagem para OCR.space e extrai calorias, passos e minutos de movimento
+    do Mi Fitness via regex no texto retornado.
+    """
+    api_key = st.secrets["OCR_SPACE_API_KEY"]
+    file_bytes = uploaded_file.getvalue()
+
+    response = requests.post(
+        "https://api.ocr.space/parse/image",
+        files={"file": (uploaded_file.name, file_bytes, uploaded_file.type or "image/jpeg")},
+        data={
+            "apikey": api_key,
+            "language": "por",
+            "isOverlayRequired": False,
+            "detectOrientation": True,
+            "scale": True,
+            "OCREngine": 2,
+        },
+        timeout=20,
+    )
+    response.raise_for_status()
+    result = response.json()
+
+    if result.get("IsErroredOnProcessing"):
+        raise ValueError(result.get("ErrorMessage", "OCR falhou"))
+
+    texto = " ".join(
+        p.get("ParsedText", "")
+        for p in result.get("ParsedResults", [])
+    )
+
+    def extrair_numero(patterns: list[str], texto: str) -> float | None:
+        for pat in patterns:
+            m = re.search(pat, texto, re.IGNORECASE)
+            if m:
+                try:
+                    return float(m.group(1).replace(",", "."))
+                except Exception:
+                    pass
+        return None
+
+    calorias = extrair_numero(
+        [r"(\d+[\.,]?\d*)\s*kcal", r"Calorias\D{0,10}(\d+)"],
+        texto,
+    )
+    passos = extrair_numero(
+        [r"(\d[\d\.]*)\s*passos", r"Passos\D{0,10}([\d\.]+)"],
+        texto,
+    )
+    movimento = extrair_numero(
+        [r"(\d+)\s*min", r"Movimento\D{0,10}(\d+)"],
+        texto,
+    )
+
+    # limpar separador de milhar em passos (ex: "1.221" → 1221)
+    if passos and passos < 10 and "." in str(passos):
+        passos = passos * 1000
+
+    return {
+        "calorias_ativas": calorias,
+        "passos": int(passos) if passos else None,
+        "minutos_movimento": int(movimento) if movimento else None,
+        "texto_ocr": texto[:300],
+    }
+
+
 def save_measurement_turso(
     data_medicao, peso, gordura, musculo, agua, visceral, proteina,
     massa_ossea, imc, basal, score, origem, imagem_nome, observacoes,
@@ -473,6 +592,7 @@ def load_nutri_df() -> pd.DataFrame:
 # -----------------------------------------------------------------------------
 init_db()
 init_nutri_db()
+init_atividade_db()
 
 if "claude_analysis_html" not in st.session_state:
     st.session_state["claude_analysis_html"] = "Clique no botão para gerar uma análise com o Claude."
@@ -485,6 +605,9 @@ if "extracted_measurement" not in st.session_state:
 
 if "claude_stagnation_html" not in st.session_state:
     st.session_state["claude_stagnation_html"] = None
+
+if "mifitness_ocr" not in st.session_state:
+    st.session_state["mifitness_ocr"] = None
 
 
 # -----------------------------------------------------------------------------
@@ -711,6 +834,69 @@ body, .stApp { font-family: 'DM Sans', sans-serif; color: var(--text); }
 
 /* ── Stagnation insight ── */
 .stag-insight { border-left: 4px solid #D45F50; }
+
+/* ── Mi Fitness OCR ── */
+.mifitness-card {
+  background: linear-gradient(135deg, #1A1A2E 0%, #16213E 100%);
+  border: 1px solid #2A2A4A;
+  border-radius: var(--radius);
+  padding: 22px;
+  color: #F0F0FF;
+  margin-bottom: 16px;
+}
+.mifitness-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.6rem;
+  margin-bottom: 4px;
+  color: #F0F0FF;
+}
+.mifitness-sub {
+  color: rgba(240,240,255,.55);
+  font-size: .9rem;
+  margin-bottom: 20px;
+}
+.mifitness-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.mifitness-metric {
+  background: rgba(255,255,255,.06);
+  border-radius: 14px;
+  padding: 14px 16px;
+  text-align: center;
+}
+.mifitness-metric-icon { font-size: 1.4rem; margin-bottom: 6px; }
+.mifitness-metric-label {
+  color: rgba(240,240,255,.55);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-size: .75rem;
+  font-weight: 700;
+}
+.mifitness-metric-val {
+  font-family: 'DM Serif Display', serif;
+  font-size: 2rem;
+  line-height: 1.1;
+  color: #F0F0FF;
+}
+.mifitness-metric-unit {
+  font-family: 'DM Sans', sans-serif;
+  font-size: .85rem;
+  color: rgba(240,240,255,.5);
+}
+.ocr-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,.08);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: .8rem;
+  color: rgba(240,240,255,.6);
+  margin-top: 14px;
+}
+.ocr-dot { width: 7px; height: 7px; border-radius: 50%; background: #6BCFC5; }
 
 @media (max-width: 900px){
   .score-card { min-height: 180px; }
@@ -1335,6 +1521,212 @@ with tab_nutri:
     <div class="nutri-meta">20h · Turno noturno</div>
 </div>
 """))
+
+    st.markdown("---")
+
+    # ── Mi Fitness OCR ────────────────────────────────────────────────────────
+    st.markdown("### 🏃 Atividade física — Mi Fitness")
+
+    df_ativ = load_atividade_df()
+
+    # Cards de atividade de hoje
+    ativ_hoje: dict = {}
+    if not df_ativ.empty:
+        ativ_hoje_rows = df_ativ[df_ativ["data_log"].dt.date == date.today()]
+        if not ativ_hoje_rows.empty:
+            r2 = ativ_hoje_rows.iloc[0]
+            ativ_hoje = {
+                "calorias_ativas": float(r2.get("calorias_ativas") or 0),
+                "passos":          int(r2.get("passos") or 0),
+                "minutos_movimento": int(r2.get("minutos_movimento") or 0),
+            }
+
+    cal_ativas_hoje = ativ_hoje.get("calorias_ativas", 0)
+    passos_hoje     = ativ_hoje.get("passos", 0)
+    mov_hoje        = ativ_hoje.get("minutos_movimento", 0)
+
+    META_PASSOS = 8000
+    META_MOV    = 30
+    passos_pct  = min(passos_hoje / META_PASSOS, 1.0)
+    mov_pct     = min(mov_hoje / META_MOV, 1.0)
+
+    ac1, ac2, ac3 = st.columns(3, gap="small")
+    with ac1:
+        st.html(html_block(f"""
+<div class="nutri-card">
+    <div class="nutri-label">🔥 Calorias ativas</div>
+    <div class="nutri-val">{int(cal_ativas_hoje)}<span class="nutri-unit"> kcal</span></div>
+    <div class="nutri-meta">Queima do dia</div>
+</div>
+"""))
+    with ac2:
+        st.html(html_block(f"""
+<div class="nutri-card">
+    <div class="nutri-label">👟 Passos</div>
+    <div class="nutri-val">{passos_hoje:,}<span class="nutri-unit"> passos</span></div>
+    <div class="prot-bar-wrap">
+        <div class="prot-bar-fill" style="width:{passos_pct*100:.1f}%;background:linear-gradient(90deg,#D4A84B,#E8C26A)"></div>
+    </div>
+    <div class="nutri-meta">Meta: {META_PASSOS:,} · {passos_pct*100:.0f}%</div>
+</div>
+"""))
+    with ac3:
+        st.html(html_block(f"""
+<div class="nutri-card">
+    <div class="nutri-label">⏱ Movimento</div>
+    <div class="nutri-val">{mov_hoje}<span class="nutri-unit"> min</span></div>
+    <div class="prot-bar-wrap">
+        <div class="prot-bar-fill" style="width:{mov_pct*100:.1f}%;background:linear-gradient(90deg,#5FA04E,#7EC86E)"></div>
+    </div>
+    <div class="nutri-meta">Meta: {META_MOV} min · {mov_pct*100:.0f}%</div>
+</div>
+"""))
+
+    # Upload Mi Fitness
+    st.markdown("**Importar do Mi Fitness via OCR**")
+    col_up_mif, col_clr_mif = st.columns([3, 1], gap="small")
+
+    with col_up_mif:
+        upload_mif = st.file_uploader(
+            "Print do Mi Fitness",
+            type=["png", "jpg", "jpeg", "webp"],
+            label_visibility="collapsed",
+            key="mifitness_uploader",
+        )
+
+    with col_clr_mif:
+        if st.button("Limpar", key="clear_mif", use_container_width=True):
+            st.session_state["mifitness_ocr"] = None
+            st.rerun()
+
+    if upload_mif is not None:
+        col_prev, col_ocr_result = st.columns([1, 2], gap="medium")
+        with col_prev:
+            st.image(upload_mif, caption="Preview", use_container_width=True)
+
+        with col_ocr_result:
+            if st.button("✦ Extrair via OCR.space", use_container_width=True, key="btn_ocr"):
+                try:
+                    with st.spinner("OCR processando..."):
+                        ocr_result = extrair_mifitness_ocr(upload_mif)
+                    st.session_state["mifitness_ocr"] = ocr_result
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro no OCR: {e}")
+
+            ocr = st.session_state.get("mifitness_ocr")
+            if ocr:
+                cal_ocr = ocr.get("calorias_ativas")
+                pas_ocr = ocr.get("passos")
+                mov_ocr = ocr.get("minutos_movimento")
+
+                # Card de resultado
+                cal_str = f'{int(cal_ocr)} kcal' if cal_ocr is not None else "—"
+                pas_str = f'{pas_ocr:,} passos' if pas_ocr is not None else "—"
+                mov_str = f'{mov_ocr} min' if mov_ocr is not None else "—"
+
+                st.html(html_block(f"""
+<div class="mifitness-card">
+    <div class="mifitness-title">Mi Fitness — leitura OCR</div>
+    <div class="mifitness-sub">Extraído de {upload_mif.name}</div>
+    <div class="mifitness-grid">
+        <div class="mifitness-metric">
+            <div class="mifitness-metric-icon">🔥</div>
+            <div class="mifitness-metric-label">Calorias</div>
+            <div class="mifitness-metric-val">{int(cal_ocr) if cal_ocr else '—'}<span class="mifitness-metric-unit"> kcal</span></div>
+        </div>
+        <div class="mifitness-metric">
+            <div class="mifitness-metric-icon">👟</div>
+            <div class="mifitness-metric-label">Passos</div>
+            <div class="mifitness-metric-val">{f"{pas_ocr:,}" if pas_ocr else '—'}<span class="mifitness-metric-unit"> passos</span></div>
+        </div>
+        <div class="mifitness-metric">
+            <div class="mifitness-metric-icon">⏱</div>
+            <div class="mifitness-metric-label">Movimento</div>
+            <div class="mifitness-metric-val">{mov_ocr if mov_ocr else '—'}<span class="mifitness-metric-unit"> min</span></div>
+        </div>
+    </div>
+    <div class="ocr-badge"><span class="ocr-dot"></span> OCR.space Engine 2</div>
+</div>
+"""))
+
+                # Formulário de confirmação e salvar
+                with st.form("form_salvar_atividade"):
+                    fs1, fs2, fs3 = st.columns(3)
+                    with fs1:
+                        data_ativ = st.date_input("Data", value=date.today(), key="data_ativ")
+                    with fs2:
+                        cal_conf = st.number_input(
+                            "Calorias ativas (kcal)",
+                            value=float(cal_ocr or 0), step=1.0, key="cal_conf",
+                        )
+                        pas_conf = st.number_input(
+                            "Passos",
+                            value=float(pas_ocr or 0), step=1.0, key="pas_conf",
+                        )
+                    with fs3:
+                        mov_conf = st.number_input(
+                            "Movimento (min)",
+                            value=float(mov_ocr or 0), step=1.0, key="mov_conf",
+                        )
+
+                    submitted_ativ = st.form_submit_button(
+                        "Salvar atividade no Turso", use_container_width=True
+                    )
+
+                if submitted_ativ:
+                    try:
+                        save_atividade_log(
+                            data_log=str(data_ativ),
+                            calorias_ativas=float(cal_conf),
+                            passos=int(pas_conf),
+                            minutos_movimento=int(mov_conf),
+                            origem="ocr_mifitness",
+                        )
+                        st.success("Atividade salva no Turso!")
+                        st.session_state["mifitness_ocr"] = None
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro ao salvar: {e}")
+
+    # Histórico de atividade
+    if not df_ativ.empty and len(df_ativ) >= 2:
+        st.markdown("---")
+        df_ativ_chart = df_ativ.sort_values("data_log").tail(14).copy()
+        x_ativ = df_ativ_chart["data_log"].dt.strftime("%d/%m").tolist()
+
+        fig_ativ = go.Figure()
+        fig_ativ.add_trace(go.Bar(
+            x=x_ativ, y=df_ativ_chart["passos"].tolist(),
+            name="Passos", marker_color="#D4A84B",
+            yaxis="y",
+        ))
+        fig_ativ.add_trace(go.Scatter(
+            x=x_ativ,
+            y=[META_PASSOS] * len(df_ativ_chart),
+            mode="lines", name=f"Meta passos ({META_PASSOS:,})",
+            line=dict(color="#B07D3A", dash="dash", width=2),
+            yaxis="y",
+        ))
+        fig_ativ.add_trace(go.Scatter(
+            x=x_ativ, y=df_ativ_chart["calorias_ativas"].tolist(),
+            mode="lines+markers", name="Cal. ativas",
+            line=dict(color="#D45F50", width=2),
+            marker=dict(size=6), yaxis="y2",
+        ))
+        fig_ativ.update_layout(
+            title="Atividade física — últimos 14 dias",
+            height=300,
+            paper_bgcolor="#FDFAF5", plot_bgcolor="#FDFAF5",
+            margin=dict(l=10, r=10, t=50, b=10),
+            legend=dict(orientation="h", y=1.12),
+            font=dict(color="#2C2A26"),
+            bargap=0.35,
+            yaxis=dict(title="Passos", color="#D4A84B", showgrid=True, gridcolor="#EEE9DF"),
+            yaxis2=dict(title="Kcal", overlaying="y", side="right", color="#D45F50", showgrid=False),
+        )
+        fig_ativ.update_xaxes(showgrid=False, color="#9A9590")
+        st.plotly_chart(fig_ativ, use_container_width=True, config={"displayModeBar": False})
 
     st.markdown("---")
 
