@@ -39,7 +39,6 @@ streamlit run app.py
 ## Troubleshooting no Streamlit Cloud
 Se o app ficar preso em **"Your app is in the oven"**, abra os logs de build/runtime no Streamlit Cloud.
 Um erro comum é permissão de escrita no banco SQLite em diretório do repositório.
-Outro erro comum é `ModuleNotFoundError` de libs opcionais/não instaladas no runtime.
 
 A aplicação já tenta automaticamente:
 1. `SQLITE_DB_PATH` (quando definido);
