@@ -265,7 +265,15 @@ def calcular_projecao(
     x = (df["data_medicao"] - df["data_medicao"].min()).dt.days.values
     y = df[coluna].values
 
-    coeffs = np.polyfit(x, y, 1)
+    # Se todos os x são iguais (1 único dia de dado), polyfit explode
+    if len(set(x)) < 2:
+        return [], []
+
+    try:
+        coeffs = np.polyfit(x, y, 1)
+    except np.linalg.LinAlgError:
+        return [], []
+
     slope = coeffs[0]
 
     if slope == 0:
