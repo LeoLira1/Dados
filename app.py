@@ -1931,7 +1931,9 @@ with tab_graficos:
         return dict(showgrid=False, tickformat="%d/%m", color=MUTED, zeroline=False, fixedrange=True)
 
     def base_yaxis(**kwargs):
-        return dict(showgrid=True, gridcolor=GRID, color=MUTED, zeroline=False, fixedrange=True, **kwargs)
+        defaults = dict(showgrid=True, gridcolor=GRID, color=MUTED, zeroline=False, fixedrange=True)
+        defaults.update(kwargs)
+        return defaults
 
     # ── Dados disponíveis ──────────────────────────────────────────────────────
     df_graf = df_db.copy() if not df_db.empty else historico.copy()
