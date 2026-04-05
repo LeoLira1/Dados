@@ -50,8 +50,6 @@ Se quiser forçar explicitamente no Cloud, adicione em **Secrets**:
 SQLITE_DB_PATH = "/tmp/health.db"
 ```
 
-Se aparecer erro de `plotly`, confirme que o build instalou `requirements.txt` da branch publicada e faça **Reboot app**.
-
 ## Turso
 Atualmente a persistência está implementada em SQLite local via `sqlite3`.
 Para produção em Turso, o próximo passo é trocar o repositório de dados por cliente libSQL/Turso usando `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` sem alterar a camada de UI do Streamlit.
