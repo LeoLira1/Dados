@@ -13,13 +13,15 @@ Aplicação em Python/Streamlit baseada no layout enviado, preservando comportam
 - Streamlit
 - Pandas + Plotly
 - SQLite (persistência local)
-- Anthropic API (opcional)
+- Anthropic API (opcional, dependência separada)
 
 ## Como rodar localmente
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+# opcional para IA com Claude:
+pip install anthropic==0.52.0
 streamlit run app.py
 ```
 
@@ -33,6 +35,20 @@ streamlit run app.py
 3. Em **Secrets**, adicione:
    - `ANTHROPIC_API_KEY = "..."` (opcional)
 4. Deploy.
+
+## Troubleshooting no Streamlit Cloud
+Se o app ficar preso em **"Your app is in the oven"**, abra os logs de build/runtime no Streamlit Cloud.
+Um erro comum é permissão de escrita no banco SQLite em diretório do repositório.
+
+A aplicação já tenta automaticamente:
+1. `SQLITE_DB_PATH` (quando definido);
+2. `data/health.db`;
+3. fallback para `/tmp/health.db` (compatível com ambiente read-only).
+
+Se quiser forçar explicitamente no Cloud, adicione em **Secrets**:
+```toml
+SQLITE_DB_PATH = "/tmp/health.db"
+```
 
 ## Turso
 Atualmente a persistência está implementada em SQLite local via `sqlite3`.
