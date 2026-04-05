@@ -13,13 +13,15 @@ Aplicação em Python/Streamlit baseada no layout enviado, preservando comportam
 - Streamlit
 - Pandas + Plotly
 - SQLite (persistência local)
-- Anthropic API (opcional)
+- Anthropic API (opcional, dependência separada)
 
 ## Como rodar localmente
 ```bash
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
+# opcional para IA com Claude:
+pip install anthropic==0.52.0
 streamlit run app.py
 ```
 
