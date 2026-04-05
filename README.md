@@ -34,6 +34,20 @@ streamlit run app.py
    - `ANTHROPIC_API_KEY = "..."` (opcional)
 4. Deploy.
 
+## Troubleshooting no Streamlit Cloud
+Se o app ficar preso em **"Your app is in the oven"**, abra os logs de build/runtime no Streamlit Cloud.
+Um erro comum é permissão de escrita no banco SQLite em diretório do repositório.
+
+A aplicação já tenta automaticamente:
+1. `SQLITE_DB_PATH` (quando definido);
+2. `data/health.db`;
+3. fallback para `/tmp/health.db` (compatível com ambiente read-only).
+
+Se quiser forçar explicitamente no Cloud, adicione em **Secrets**:
+```toml
+SQLITE_DB_PATH = "/tmp/health.db"
+```
+
 ## Turso
 Atualmente a persistência está implementada em SQLite local via `sqlite3`.
 Para produção em Turso, o próximo passo é trocar o repositório de dados por cliente libSQL/Turso usando `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN` sem alterar a camada de UI do Streamlit.

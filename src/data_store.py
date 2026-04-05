@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import sqlite3
+import tempfile
 from dataclasses import dataclass
 from datetime import date
 from typing import Iterable, List
@@ -50,10 +51,31 @@ SEED_MEASUREMENTS: list[Measurement] = [
 class MeasurementRepository:
     def __init__(self) -> None:
         db_path = os.getenv("SQLITE_DB_PATH", "data/health.db")
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        self.conn = sqlite3.connect(db_path, check_same_thread=False)
+        self.conn = self._connect_with_fallback(db_path)
         self.conn.row_factory = sqlite3.Row
         self._init_schema()
+
+    @staticmethod
+    def _connect_with_fallback(db_path: str) -> sqlite3.Connection:
+        """Conecta no SQLite, com fallback para /tmp em ambientes read-only (Streamlit Cloud)."""
+        candidates = [db_path]
+        fallback_path = os.path.join(tempfile.gettempdir(), "health.db")
+        if fallback_path not in candidates:
+            candidates.append(fallback_path)
+
+        last_error: Exception | None = None
+        for candidate in candidates:
+            try:
+                directory = os.path.dirname(candidate)
+                if directory:
+                    os.makedirs(directory, exist_ok=True)
+                return sqlite3.connect(candidate, check_same_thread=False)
+            except OSError as exc:
+                last_error = exc
+
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("Falha ao inicializar conexão SQLite.")
 
     def _init_schema(self) -> None:
         self.conn.execute(
