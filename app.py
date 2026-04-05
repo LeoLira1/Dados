@@ -69,6 +69,85 @@ def num_or_none(value):
 
 
 # -----------------------------------------------------------------------------
+# SCORE DE RECOMPOSIÇÃO CORPORAL (customizado — ignora IMC/peso total)
+#
+# Lógica: quem busca corpo corpulento/musculoso não deve ser penalizado
+# por ter peso alto. O score mede QUALIDADE da composição, não o peso.
+#
+# Pesos:
+#   40% → Gordura corporal   (meta 20%, pior ~35%)
+#   30% → Gordura visceral   (meta 8, pior 20)
+#   30% → Massa muscular     (meta 68 kg, pior 55 kg)
+#
+# Cada componente é normalizado 0–100 e ponderado.
+# Score final: 0 = péssimo, 100 = excelente
+# -----------------------------------------------------------------------------
+RECOMP_CONFIG = {
+    # Gordura corporal %
+    "gordura_pior": 35.0,   # score 0 aqui
+    "gordura_meta": 20.0,   # score 100 aqui
+    "gordura_peso": 0.40,
+
+    # Gordura visceral (nível Zepp 1–20+)
+    "visceral_pior": 20.0,
+    "visceral_meta": 8.0,
+    "visceral_peso": 0.30,
+
+    # Massa muscular kg
+    "musculo_pior": 55.0,
+    "musculo_meta": 68.0,
+    "musculo_peso": 0.30,
+}
+
+
+def calcular_score_recomp(gordura: float, visceral: float, musculo: float) -> float:
+    """
+    Calcula score de recomposição 0-100.
+    Ignora peso total e IMC — pensado pra quem quer corpo corpulento e musculoso.
+    """
+    cfg = RECOMP_CONFIG
+
+    # Componente gordura (quanto menor melhor)
+    g_range = cfg["gordura_pior"] - cfg["gordura_meta"]
+    g_score = max(0.0, min(1.0, (cfg["gordura_pior"] - gordura) / g_range)) * 100
+
+    # Componente visceral (quanto menor melhor)
+    v_range = cfg["visceral_pior"] - cfg["visceral_meta"]
+    v_score = max(0.0, min(1.0, (cfg["visceral_pior"] - visceral) / v_range)) * 100
+
+    # Componente músculo (quanto maior melhor)
+    m_range = cfg["musculo_meta"] - cfg["musculo_pior"]
+    m_score = max(0.0, min(1.0, (musculo - cfg["musculo_pior"]) / m_range)) * 100
+
+    total = (
+        g_score * cfg["gordura_peso"]
+        + v_score * cfg["visceral_peso"]
+        + m_score * cfg["musculo_peso"]
+    )
+    return round(total, 1)
+
+
+def score_label(score: float) -> str:
+    if score >= 80:
+        return "Excelente"
+    if score >= 65:
+        return "Muito bom"
+    if score >= 50:
+        return "Bom"
+    if score >= 35:
+        return "Em progresso"
+    return "Iniciando"
+
+
+def score_color(score: float) -> str:
+    if score >= 65:
+        return "#5FA04E"
+    if score >= 45:
+        return "#D4A84B"
+    return "#D45F50"
+
+
+# -----------------------------------------------------------------------------
 # CLAUDE
 # -----------------------------------------------------------------------------
 @st.cache_resource
@@ -187,39 +266,33 @@ Regras:
 def analyze_extracted_measurement(extracted: dict, current_data: dict) -> str:
     prompt = f"""
 Analise esta nova medição corporal comparando com os dados atuais.
+O objetivo é recomposição corporal: ganhar massa muscular, reduzir gordura e gordura visceral.
+Peso alto não é problema — o foco é corpo corpulento e musculoso, não peso baixo.
 
 Dados atuais:
 - Peso: {current_data.get("peso")}
-- Gordura: {current_data.get("gordura")}
-- Músculo: {current_data.get("musculo")}
-- Água: {current_data.get("agua")}
+- Gordura: {current_data.get("gordura")}%
+- Músculo: {current_data.get("musculo")} kg
+- Água: {current_data.get("agua")}%
 - Visceral: {current_data.get("visceral")}
-- Proteína: {current_data.get("proteina")}
-- Massa óssea: {current_data.get("massa_ossea")}
-- IMC: {current_data.get("imc")}
-- Basal: {current_data.get("basal")}
-- Score: {current_data.get("score")}
+- Proteína: {current_data.get("proteina")}%
+- Score recomposição: {current_data.get("score_recomp")}
 
 Nova medição extraída:
 - Data: {extracted.get("data_medicao")}
 - Peso: {extracted.get("peso")}
-- Gordura: {extracted.get("gordura")}
-- Músculo: {extracted.get("musculo")}
-- Água: {extracted.get("agua")}
+- Gordura: {extracted.get("gordura")}%
+- Músculo: {extracted.get("musculo")} kg
 - Visceral: {extracted.get("visceral")}
-- Proteína: {extracted.get("proteina")}
-- Massa óssea: {extracted.get("massa_ossea")}
-- IMC: {extracted.get("imc")}
-- Basal: {extracted.get("basal")}
-- Score: {extracted.get("score")}
+- Proteína: {extracted.get("proteina")}%
 - Observações da leitura: {extracted.get("observacoes")}
 
 Responda em português do Brasil.
 Seja direto.
 Traga:
-1. O que melhorou
-2. O que piorou ou merece atenção
-3. O foco principal agora
+1. O que melhorou na recomposição
+2. O que merece atenção
+3. Foco principal agora
 
 Máximo de 3 blocos curtos.
 """
@@ -265,20 +338,8 @@ def init_db():
 
 
 def save_measurement_turso(
-    data_medicao,
-    peso,
-    gordura,
-    musculo,
-    agua,
-    visceral,
-    proteina,
-    massa_ossea,
-    imc,
-    basal,
-    score,
-    origem,
-    imagem_nome,
-    observacoes,
+    data_medicao, peso, gordura, musculo, agua, visceral, proteina,
+    massa_ossea, imc, basal, score, origem, imagem_nome, observacoes,
 ):
     conn = get_turso_conn()
     conn.execute(
@@ -290,20 +351,8 @@ def save_measurement_turso(
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         [
-            data_medicao,
-            peso,
-            gordura,
-            musculo,
-            agua,
-            visceral,
-            proteina,
-            massa_ossea,
-            imc,
-            basal,
-            score,
-            origem,
-            imagem_nome,
-            observacoes,
+            data_medicao, peso, gordura, musculo, agua, visceral, proteina,
+            massa_ossea, imc, basal, score, origem, imagem_nome, observacoes,
         ],
     )
     conn.commit()
@@ -402,7 +451,7 @@ else:
         "massa_ossea": 3.31,
         "imc": 27.3,
         "basal": 1752,
-        "score": 49,
+        "score": 49,  # score Zepp (mantido para referência, mas não exibido como principal)
     }
 
 # Valores padrão / metas
@@ -416,18 +465,47 @@ DATA_ATUAL = {
     "massa_ossea": float(current_row.get("massa_ossea") or 0),
     "imc": float(current_row.get("imc") or 0),
     "basal": float(current_row.get("basal") or 0),
-    "score": float(current_row.get("score") or 0),
+    "score_zepp": float(current_row.get("score") or 0),   # score original Zepp
     "meta_peso": 96.0,
     "meta_gordura": 20.0,
     "peso_min": 80.0,
 }
 
-# Derivados
+# Score de recomposição — calculado aqui, não vem do Zepp
+DATA_ATUAL["score_recomp"] = calcular_score_recomp(
+    gordura=DATA_ATUAL["gordura"],
+    visceral=DATA_ATUAL["visceral"],
+    musculo=DATA_ATUAL["musculo"],
+)
+
+# Score inicial (primeira medição do histórico)
 first_row = historico.iloc[0]
 peso_inicial = float(first_row["peso"])
 gordura_inicial = float(first_row["gordura"])
 musculo_inicial = float(first_row["musculo"])
 
+score_inicial = calcular_score_recomp(
+    gordura=gordura_inicial,
+    visceral=DATA_ATUAL["visceral"],   # visceral inicial não temos no histórico simples
+    musculo=musculo_inicial,
+)
+
+delta_score = DATA_ATUAL["score_recomp"] - score_inicial
+
+# Calcular score_recomp para todo o histórico (usando visceral atual como constante —
+# pois histórico simples não guarda visceral; quando vier do DB já terá)
+if "visceral" in historico.columns:
+    historico["score_recomp"] = historico.apply(
+        lambda r: calcular_score_recomp(r["gordura"], r.get("visceral", DATA_ATUAL["visceral"]), r["musculo"]),
+        axis=1,
+    )
+else:
+    historico["score_recomp"] = historico.apply(
+        lambda r: calcular_score_recomp(r["gordura"], DATA_ATUAL["visceral"], r["musculo"]),
+        axis=1,
+    )
+
+# Derivados
 delta_peso_total = DATA_ATUAL["peso"] - peso_inicial
 delta_gordura = DATA_ATUAL["gordura"] - gordura_inicial
 delta_musculo = DATA_ATUAL["musculo"] - musculo_inicial
@@ -449,6 +527,11 @@ musculo_status = "Boa" if DATA_ATUAL["musculo"] >= musculo_inicial else "Baixa"
 agua_status = "Insuf." if DATA_ATUAL["agua"] < 52 else "Boa"
 visceral_status = "Alta" if DATA_ATUAL["visceral"] >= 13 else "Boa"
 proteina_status = "Normal" if DATA_ATUAL["proteina"] >= 16 else "Baixa"
+
+_sc = DATA_ATUAL["score_recomp"]
+_sc_color = score_color(_sc)
+_sc_label = score_label(_sc)
+_delta_score_txt = (f"+{fmt_num(delta_score, 1)}" if delta_score >= 0 else fmt_num(delta_score, 1))
 
 
 # -----------------------------------------------------------------------------
@@ -484,11 +567,22 @@ body, .stApp { font-family: 'DM Sans', sans-serif; color: var(--text); }
 .metric-card, .meta-card, .proj-card, .insight-card, .score-card, .upload-card, .history-card {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 2px 12px rgba(44,42,38,.03);
 }
-.score-card { background: linear-gradient(135deg, #2C2A26 0%, #252320 100%); color:white; padding:22px 18px; min-height:232px; position:relative; overflow:hidden; }
-.score-card::before{ content:''; position:absolute; top:-34px; right:-34px; width:120px; height:120px; background: var(--coral); opacity:.14; border-radius:50%; }
-.score-label { font-size:.95rem; text-transform:uppercase; letter-spacing:.10em; opacity:.65; }
-.score-num { font-family:'DM Serif Display', serif; font-size:6rem; line-height:1; margin-top:12px; }
-.score-delta { color:#65d0c2; font-size:1.6rem; font-weight:600; margin-top:12px; }
+
+/* Score card customizado — cor dinâmica via style inline */
+.score-card {
+  padding:22px 18px; min-height:232px; position:relative; overflow:hidden; color:white;
+  background: linear-gradient(135deg, #2C2A26 0%, #252320 100%);
+}
+.score-card::before{ content:''; position:absolute; top:-34px; right:-34px; width:120px; height:120px; opacity:.18; border-radius:50%; }
+.score-label { font-size:.85rem; text-transform:uppercase; letter-spacing:.10em; opacity:.60; }
+.score-sublabel { font-size:.78rem; opacity:.45; margin-top:2px; letter-spacing:.04em; }
+.score-num { font-family:'DM Serif Display', serif; font-size:5.5rem; line-height:1; margin-top:10px; }
+.score-status { font-size:1rem; font-weight:700; margin-top:8px; opacity:.9; }
+.score-delta { color:#65d0c2; font-size:1.1rem; font-weight:600; margin-top:6px; opacity:.85; }
+.score-breakdown { margin-top:14px; display:flex; flex-direction:column; gap:5px; }
+.score-bar-row { display:flex; align-items:center; gap:8px; font-size:.78rem; opacity:.7; }
+.score-bar-bg { flex:1; height:4px; background:rgba(255,255,255,.15); border-radius:999px; }
+.score-bar-fill { height:100%; border-radius:999px; }
 
 .metric-card { padding:18px 18px 20px 18px; position:relative; overflow:hidden; min-height:108px; }
 .metric-card::after{ content:''; position:absolute; left:0; right:0; bottom:0; height:4px; }
@@ -545,7 +639,7 @@ body, .stApp { font-family: 'DM Sans', sans-serif; color: var(--text); }
 
 @media (max-width: 900px){
   .score-card { min-height: 180px; }
-  .score-num { font-size: 4.6rem; }
+  .score-num { font-size: 4.2rem; }
   .metric-value { font-size: 2.1rem; }
   .meta-title { font-size: 1.5rem; }
   .meta-current, .meta-goal { font-size: 2.2rem; }
@@ -580,6 +674,7 @@ st.html(
             <div class="banner-sub">
                 Meta simultânea: ganhar +{fmt_num(DATA_ATUAL["meta_peso"] - DATA_ATUAL["peso"], 1)} kg
                 e reduzir −{fmt_num(DATA_ATUAL["gordura"] - DATA_ATUAL["meta_gordura"], 1)} pp de gordura.
+                Corpo mais corpulento, não mais leve.
             </div>
         </div>
     </div>
@@ -589,17 +684,54 @@ st.html(
 )
 
 # -----------------------------------------------------------------------------
-# SCORE + STATS
+# SCORE DE RECOMPOSIÇÃO + STATS
 # -----------------------------------------------------------------------------
+
+# Calcula componentes individuais para exibir no breakdown
+cfg = RECOMP_CONFIG
+g_range = cfg["gordura_pior"] - cfg["gordura_meta"]
+g_pct = max(0.0, min(1.0, (cfg["gordura_pior"] - DATA_ATUAL["gordura"]) / g_range))
+
+v_range = cfg["visceral_pior"] - cfg["visceral_meta"]
+v_pct = max(0.0, min(1.0, (cfg["visceral_pior"] - DATA_ATUAL["visceral"]) / v_range))
+
+m_range = cfg["musculo_meta"] - cfg["musculo_pior"]
+m_pct = max(0.0, min(1.0, (DATA_ATUAL["musculo"] - cfg["musculo_pior"]) / m_range))
+
 col_score, col_stats = st.columns([1.1, 4.2], gap="medium")
 
 with col_score:
     st.html(
         html_block(f"""
-<div class="score-card">
-    <div class="score-label">Score</div>
-    <div class="score-num">{int(round(DATA_ATUAL["score"]))}</div>
-    <div class="score-delta">{'↓' if delta_peso_total < 0 else '↑'} {fmt_num(abs(delta_peso_total), 2)} kg</div>
+<div class="score-card" style="border-top: 4px solid {_sc_color};">
+    <div class="score-label">Score Recomposição</div>
+    <div class="score-sublabel">Gordura · Visceral · Músculo</div>
+    <div class="score-num" style="color:{_sc_color};">{fmt_num(_sc, 1)}</div>
+    <div class="score-status" style="color:{_sc_color};">{_sc_label}</div>
+    <div class="score-delta">{_delta_score_txt} pts desde o início</div>
+    <div class="score-breakdown">
+        <div class="score-bar-row">
+            <span style="width:52px">Gordura</span>
+            <div class="score-bar-bg">
+                <div class="score-bar-fill" style="width:{g_pct*100:.0f}%;background:#D45F50;"></div>
+            </div>
+            <span>{g_pct*100:.0f}%</span>
+        </div>
+        <div class="score-bar-row">
+            <span style="width:52px">Visceral</span>
+            <div class="score-bar-bg">
+                <div class="score-bar-fill" style="width:{v_pct*100:.0f}%;background:#5BA8C4;"></div>
+            </div>
+            <span>{v_pct*100:.0f}%</span>
+        </div>
+        <div class="score-bar-row">
+            <span style="width:52px">Músculo</span>
+            <div class="score-bar-bg">
+                <div class="score-bar-fill" style="width:{m_pct*100:.0f}%;background:#5FA04E;"></div>
+            </div>
+            <span>{m_pct*100:.0f}%</span>
+        </div>
+    </div>
 </div>
 """)
     )
@@ -658,7 +790,7 @@ fig.add_trace(
     go.Scatter(
         x=historico["data_medicao"],
         y=historico["gordura"],
-        name="Gordura",
+        name="Gordura %",
         mode="lines+markers",
         line=dict(color="#D45F50", width=3, shape="spline", smoothing=1.1),
         marker=dict(size=6, color="#D45F50"),
@@ -687,10 +819,22 @@ fig.add_trace(
     ),
     secondary_y=False,
 )
+# Score de recomposição no gráfico (eixo secundário reaproveitado como %)
+fig.add_trace(
+    go.Scatter(
+        x=historico["data_medicao"],
+        y=historico["score_recomp"],
+        name="Score Recomp.",
+        mode="lines",
+        line=dict(color="#D4A84B", width=2, dash="dot"),
+        opacity=0.85,
+    ),
+    secondary_y=True,
+)
 
 fig.update_layout(
-    title=dict(text="Evolução da composição", x=0.01, xanchor="left", font=dict(size=28)),
-    height=440,
+    title=dict(text="Evolução da composição & Score Recomposição", x=0.01, xanchor="left", font=dict(size=26)),
+    height=460,
     paper_bgcolor="#FDFAF5",
     plot_bgcolor="#FDFAF5",
     margin=dict(l=20, r=20, t=70, b=20),
@@ -698,25 +842,9 @@ fig.update_layout(
     font=dict(color="#2C2A26"),
     dragmode=False,
 )
-fig.update_xaxes(
-    showgrid=False,
-    tickformat="%d/%m",
-    color="#9A9590",
-    zeroline=False,
-    fixedrange=True,
-)
-fig.update_yaxes(
-    title_text="Peso / Músculo (kg)",
-    color="#9A9590",
-    secondary_y=False,
-    fixedrange=True,
-)
-fig.update_yaxes(
-    title_text="Gordura (%)",
-    color="#D45F50",
-    secondary_y=True,
-    fixedrange=True,
-)
+fig.update_xaxes(showgrid=False, tickformat="%d/%m", color="#9A9590", zeroline=False, fixedrange=True)
+fig.update_yaxes(title_text="Peso / Músculo (kg)", color="#9A9590", secondary_y=False, fixedrange=True)
+fig.update_yaxes(title_text="Gordura (%) · Score (0-100)", color="#D45F50", secondary_y=True, fixedrange=True)
 
 st.plotly_chart(
     fig,
@@ -870,25 +998,25 @@ with p2:
 if st.button("✦ Analisar agora com Claude", use_container_width=True):
     prompt = f"""
 Analise estes dados de composição corporal em português do Brasil.
+O objetivo do usuário é recomposição corporal: corpo mais corpulento e musculoso.
+Ele NÃO quer emagrecer no sentido clássico — quer menos gordura e mais músculo mantendo peso alto.
+Ignore IMC. O peso alto não é um problema.
 
 Peso atual: {DATA_ATUAL["peso"]} kg
 Gordura atual: {DATA_ATUAL["gordura"]} %
 Músculo atual: {DATA_ATUAL["musculo"]} kg
 Água: {DATA_ATUAL["agua"]} %
-Visceral: {DATA_ATUAL["visceral"]}
+Visceral: {DATA_ATUAL["visceral"]} (meta: abaixo de 10)
 Proteína: {DATA_ATUAL["proteina"]} %
-Massa óssea: {DATA_ATUAL["massa_ossea"]} kg
-IMC: {DATA_ATUAL["imc"]}
-Basal: {DATA_ATUAL["basal"]}
-Meta de peso: {DATA_ATUAL["meta_peso"]} kg
+Score recomposição: {DATA_ATUAL["score_recomp"]}/100 ({_sc_label})
 Meta de gordura: {DATA_ATUAL["meta_gordura"]} %
-Delta de peso: {delta_peso_total:.1f} kg
+Meta de músculo: {cfg["musculo_meta"]} kg
 Delta de gordura: {delta_gordura:.1f} pp
 Delta de músculo: {delta_musculo:.1f} kg
 Dias avaliados: {dias_periodo}
 
 Quero:
-1. O que melhorou
+1. O que melhorou na recomposição
 2. Principal gargalo
 3. O que priorizar agora
 
@@ -907,7 +1035,6 @@ Máximo 3 blocos curtos.
 if not df_db.empty:
     hist_short = df_db.sort_values("data_medicao", ascending=False).head(5).copy()
     rows_html = ""
-    prev_vals = hist_short["peso"].tolist()
     for i, (_, row) in enumerate(hist_short.iterrows()):
         dt = row["data_medicao"].strftime("%d %b") if pd.notna(row["data_medicao"]) else "Sem data"
         peso_txt = f"{fmt_num(row['peso'],1)} kg" if pd.notna(row["peso"]) else "—"
@@ -1012,7 +1139,7 @@ if upload is not None:
                 proteina = st.number_input("Proteína", value=float(extracted.get("proteina") or 0.0), step=0.1)
                 basal = st.number_input("Basal", value=float(extracted.get("basal") or 0.0), step=1.0)
 
-            score = st.number_input("Score", value=float(extracted.get("score") or 0.0), step=1.0)
+            score = st.number_input("Score Zepp (referência)", value=float(extracted.get("score") or 0.0), step=1.0)
             observacoes = st.text_area(
                 "Observações",
                 value=extracted.get("observacoes") or "",
