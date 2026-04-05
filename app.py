@@ -79,7 +79,7 @@ def get_claude_client():
 def ask_claude_analysis(prompt: str) -> str:
     client = get_claude_client()
     response = client.messages.create(
-        model="claude-opus-4-6",
+        model="claude-sonnet-4-6",
         max_tokens=700,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -127,7 +127,7 @@ Regras:
 """
 
     response = client.messages.create(
-        model="claude-opus-4-6",
+        model="claude-sonnet-4-6",
         max_tokens=700,
         messages=[
             {
@@ -465,89 +465,30 @@ st.html(
 }
 html, body, .stApp { background: var(--bg); }
 body, .stApp { font-family: 'DM Sans', sans-serif; color: var(--text); }
-.block-container { padding-top: 0.6rem; padding-bottom: 3rem; max-width: 1180px; }
+.block-container { padding-top: 1.8rem; padding-bottom: 3rem; max-width: 1180px; }
 [data-testid="stHeader"]{ background: transparent; }
 
-/* ── HEADER COMPACTO ────────────────────────────────────────────────────── */
-.top-header { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:4px; }
-.page-title { font-family:'DM Serif Display', serif; font-size: clamp(1.6rem, 2.5vw, 2.8rem); line-height:1.1; color: var(--text); margin:0; }
+.top-header { display:flex; justify-content:space-between; align-items:flex-start; gap:16px; margin-bottom:8px; }
+.page-title { font-family:'DM Serif Display', serif; font-size: clamp(2rem, 3vw, 3.5rem); line-height:1.05; color: var(--text); margin:0; }
 .page-title em { color: var(--coral); font-style: italic; }
-.date-badge { font-size:.78rem; font-weight:700; color:var(--muted); background:#ECE7DE; border-radius:999px; padding:6px 12px; white-space:nowrap; text-transform:uppercase; letter-spacing:.06em; }
-.subtitle { color:var(--muted); font-size:.88rem; font-weight:300; margin-top:2px; margin-bottom:10px; }
+.date-badge { font-size:.85rem; font-weight:700; color:var(--muted); background:#ECE7DE; border-radius:999px; padding:8px 14px; white-space:nowrap; text-transform:uppercase; letter-spacing:.06em; }
+.subtitle { color:var(--muted); font-size:1rem; font-weight:300; margin-top:4px; margin-bottom:20px; }
 
-/* ── BANNER COMPACTO (barra fina) ───────────────────────────────────────── */
-.banner-compact {
-  background: linear-gradient(135deg, #2C2A26 0%, #3D3A34 100%);
-  border-radius: 14px;
-  padding: 12px 18px;
-  color: #F5F2EC;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 14px;
-  box-shadow: 0 4px 14px rgba(44,42,38,.10);
-}
-.banner-compact .b-left {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-.banner-compact .b-icon { font-size: 1.15rem; flex-shrink: 0; }
-.banner-compact .b-title {
-  font-family: 'DM Serif Display', serif;
-  font-size: 1.05rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.banner-compact .b-sub {
-  color: rgba(245,242,236,0.55);
-  font-size: .82rem;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-left: 6px;
-}
-.banner-compact .b-chip {
-  background: var(--honey);
-  color: var(--text);
-  font-weight: 700;
-  border-radius: 999px;
-  padding: 5px 11px;
-  text-transform: uppercase;
-  font-size: .72rem;
-  letter-spacing: .04em;
-  flex-shrink: 0;
-}
+.banner { background: linear-gradient(135deg, #2C2A26 0%, #3D3A34 100%); border-radius:24px; padding:22px 24px; color:#F5F2EC; display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:18px; box-shadow: 0 10px 24px rgba(44,42,38,.12); }
+.banner-left { display:flex; gap:14px; align-items:flex-start; }
+.banner-icon { font-size:1.8rem; line-height:1; }
+.banner-title { font-family:'DM Serif Display', serif; font-size:1.85rem; margin-bottom:4px; }
+.banner-sub { color: rgba(245,242,236,0.68); font-size:1rem; line-height:1.5; }
+.banner-chip { background: var(--honey); color: var(--text); font-weight:700; border-radius:999px; padding:8px 14px; height:fit-content; text-transform:uppercase; font-size:.8rem; }
 
-/* ── CARDS ───────────────────────────────────────────────────────────────── */
 .metric-card, .meta-card, .proj-card, .insight-card, .score-card, .upload-card, .history-card {
   background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 2px 12px rgba(44,42,38,.03);
 }
-
-/* Score card — mesmo estilo visual dos metric cards */
-.score-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  padding: 18px 18px 20px 18px;
-  position: relative;
-  overflow: hidden;
-  min-height: 108px;
-}
-.score-card::after {
-  content: '';
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  height: 4px;
-  background: linear-gradient(90deg, var(--coral), var(--honey));
-}
-.score-label { color: var(--muted); text-transform: uppercase; font-size: .82rem; letter-spacing: .06em; font-weight: 700; }
-.score-num { font-family: 'DM Serif Display', serif; color: var(--text); font-size: 2.8rem; line-height: 1.1; margin-top: 4px; }
-.score-delta { font-size: 1rem; font-weight: 600; margin-top: 8px; }
-.score-delta-up { color: var(--coral); }
-.score-delta-down { color: var(--sage); }
+.score-card { background: linear-gradient(135deg, #2C2A26 0%, #252320 100%); color:white; padding:22px 18px; min-height:232px; position:relative; overflow:hidden; }
+.score-card::before{ content:''; position:absolute; top:-34px; right:-34px; width:120px; height:120px; background: var(--coral); opacity:.14; border-radius:50%; }
+.score-label { font-size:.95rem; text-transform:uppercase; letter-spacing:.10em; opacity:.65; }
+.score-num { font-family:'DM Serif Display', serif; font-size:6rem; line-height:1; margin-top:12px; }
+.score-delta { color:#65d0c2; font-size:1.6rem; font-weight:600; margin-top:12px; }
 
 .metric-card { padding:18px 18px 20px 18px; position:relative; overflow:hidden; min-height:108px; }
 .metric-card::after{ content:''; position:absolute; left:0; right:0; bottom:0; height:4px; }
@@ -603,21 +544,19 @@ body, .stApp { font-family: 'DM Sans', sans-serif; color: var(--text); }
 .delta-up { color:var(--coral); font-weight:700; } .delta-down { color:var(--sage); font-weight:700; }
 
 @media (max-width: 900px){
-  .score-card { min-height: auto; }
-  .score-num { font-size: 2.1rem; }
+  .score-card { min-height: 180px; }
+  .score-num { font-size: 4.6rem; }
   .metric-value { font-size: 2.1rem; }
   .meta-title { font-size: 1.5rem; }
   .meta-current, .meta-goal { font-size: 2.2rem; }
   .section-title { font-size: 1.6rem; }
-  .banner-compact { flex-wrap: wrap; }
-  .banner-compact .b-sub { display: none; }
 }
 </style>
 """)
 )
 
 # -----------------------------------------------------------------------------
-# HEADER (compacto)
+# HEADER
 # -----------------------------------------------------------------------------
 st.html(
     html_block(f"""
@@ -631,108 +570,165 @@ st.html(
 """)
 )
 
-# Banner compacto — uma linha só
 st.html(
     html_block(f"""
-<div class="banner-compact">
-    <div class="b-left">
-        <span class="b-icon">⚡</span>
-        <span class="b-title">Recomposição corporal em andamento</span>
-        <span class="b-sub">
-            +{fmt_num(DATA_ATUAL["meta_peso"] - DATA_ATUAL["peso"], 1)} kg · −{fmt_num(DATA_ATUAL["gordura"] - DATA_ATUAL["meta_gordura"], 1)} pp gordura
-        </span>
+<div class="banner">
+    <div class="banner-left">
+        <div class="banner-icon">⚡</div>
+        <div>
+            <div class="banner-title">Recomposição corporal em andamento</div>
+            <div class="banner-sub">
+                Meta simultânea: ganhar +{fmt_num(DATA_ATUAL["meta_peso"] - DATA_ATUAL["peso"], 1)} kg
+                e reduzir −{fmt_num(DATA_ATUAL["gordura"] - DATA_ATUAL["meta_gordura"], 1)} pp de gordura.
+            </div>
+        </div>
     </div>
-    <div class="b-chip">Avançado</div>
+    <div class="banner-chip">Avançado</div>
 </div>
 """)
 )
 
 # -----------------------------------------------------------------------------
-# GRID DE MÉTRICAS — 4 colunas (score integrado ao grid)
+# SCORE + STATS
 # -----------------------------------------------------------------------------
-g1, g2, g3, g4 = st.columns(4, gap="small")
+col_score, col_stats = st.columns([1.1, 4.2], gap="medium")
 
-with g1:
-    delta_class = "score-delta-down" if delta_peso_total < 0 else "score-delta-up"
-    delta_arrow = "↓" if delta_peso_total < 0 else "↑"
+with col_score:
     st.html(
         html_block(f"""
 <div class="score-card">
     <div class="score-label">Score</div>
     <div class="score-num">{int(round(DATA_ATUAL["score"]))}</div>
-    <div class="score-delta {delta_class}">{delta_arrow} {fmt_num(abs(delta_peso_total), 2)} kg</div>
+    <div class="score-delta">{'↓' if delta_peso_total < 0 else '↑'} {fmt_num(abs(delta_peso_total), 2)} kg</div>
 </div>
 """)
     )
 
-with g2:
-    st.html(
-        html_block(f"""
-<div class="metric-card metric-teal">
-    <div class="metric-name">Peso</div>
-    <div class="metric-value">{fmt_num(DATA_ATUAL["peso"], 1)}<span class="metric-unit">kg</span></div>
-    <span class="tag {status_class(peso_status)}">{peso_status}</span>
+with col_stats:
+    r1c1, r1c2, r1c3 = st.columns(3, gap="small")
+    r2c1, r2c2, r2c3 = st.columns(3, gap="small")
+    cards = [
+        (r1c1, "Peso", DATA_ATUAL["peso"], "kg", peso_status, "metric-teal"),
+        (r1c2, "Gordura", DATA_ATUAL["gordura"], "%", gordura_status, "metric-coral"),
+        (r1c3, "Músculo", DATA_ATUAL["musculo"], "kg", musculo_status, "metric-sage"),
+        (r2c1, "Água", DATA_ATUAL["agua"], "%", agua_status, "metric-honey"),
+        (r2c2, "Visceral", DATA_ATUAL["visceral"], "", visceral_status, "metric-blue"),
+        (r2c3, "Proteína", DATA_ATUAL["proteina"], "%", proteina_status, "metric-brown"),
+    ]
+    for col, nome, valor, unidade, status, klass in cards:
+        with col:
+            valor_txt = fmt_num(valor, 1) if isinstance(valor, float) else str(valor)
+            st.html(
+                html_block(f"""
+<div class="metric-card {klass}">
+    <div class="metric-name">{nome}</div>
+    <div class="metric-value">{valor_txt}<span class="metric-unit">{unidade}</span></div>
+    <span class="tag {status_class(status)}">{status}</span>
 </div>
 """)
-    )
+            )
 
-with g3:
-    st.html(
-        html_block(f"""
-<div class="metric-card metric-coral">
-    <div class="metric-name">Gordura</div>
-    <div class="metric-value">{fmt_num(DATA_ATUAL["gordura"], 1)}<span class="metric-unit">%</span></div>
-    <span class="tag {status_class(gordura_status)}">{gordura_status}</span>
-</div>
-""")
-    )
+# -----------------------------------------------------------------------------
+# CHART — logo após os cards de composição corporal
+# -----------------------------------------------------------------------------
+fig = make_subplots(specs=[[{"secondary_y": True}]])
+fig.add_trace(
+    go.Scatter(
+        x=historico["data_medicao"],
+        y=historico["peso"],
+        name="Peso",
+        mode="lines+markers",
+        line=dict(color="#4AADA0", width=3, shape="spline", smoothing=1.1),
+        marker=dict(size=6, color="#4AADA0"),
+    ),
+    secondary_y=False,
+)
+fig.add_trace(
+    go.Scatter(
+        x=historico["data_medicao"],
+        y=[DATA_ATUAL["meta_peso"]] * len(historico),
+        name="Meta Peso",
+        mode="lines",
+        line=dict(color="#B07D3A", width=2, dash="dash"),
+        opacity=0.9,
+    ),
+    secondary_y=False,
+)
+fig.add_trace(
+    go.Scatter(
+        x=historico["data_medicao"],
+        y=historico["gordura"],
+        name="Gordura",
+        mode="lines+markers",
+        line=dict(color="#D45F50", width=3, shape="spline", smoothing=1.1),
+        marker=dict(size=6, color="#D45F50"),
+    ),
+    secondary_y=True,
+)
+fig.add_trace(
+    go.Scatter(
+        x=historico["data_medicao"],
+        y=[DATA_ATUAL["meta_gordura"]] * len(historico),
+        name="Meta Gordura",
+        mode="lines",
+        line=dict(color="#B07D3A", width=2, dash="dash"),
+        opacity=0.9,
+    ),
+    secondary_y=True,
+)
+fig.add_trace(
+    go.Scatter(
+        x=historico["data_medicao"],
+        y=historico["musculo"],
+        name="Músculo",
+        mode="lines+markers",
+        line=dict(color="#5FA04E", width=3, shape="spline", smoothing=1.1),
+        marker=dict(size=6, color="#5FA04E"),
+    ),
+    secondary_y=False,
+)
 
-with g4:
-    st.html(
-        html_block(f"""
-<div class="metric-card metric-sage">
-    <div class="metric-name">Músculo</div>
-    <div class="metric-value">{fmt_num(DATA_ATUAL["musculo"], 1)}<span class="metric-unit">kg</span></div>
-    <span class="tag {status_class(musculo_status)}">{musculo_status}</span>
-</div>
-""")
-    )
+fig.update_layout(
+    title=dict(text="Evolução da composição", x=0.01, xanchor="left", font=dict(size=28)),
+    height=440,
+    paper_bgcolor="#FDFAF5",
+    plot_bgcolor="#FDFAF5",
+    margin=dict(l=20, r=20, t=70, b=20),
+    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0),
+    font=dict(color="#2C2A26"),
+    dragmode=False,
+)
+fig.update_xaxes(
+    showgrid=False,
+    tickformat="%d/%m",
+    color="#9A9590",
+    zeroline=False,
+    fixedrange=True,
+)
+fig.update_yaxes(
+    title_text="Peso / Músculo (kg)",
+    color="#9A9590",
+    secondary_y=False,
+    fixedrange=True,
+)
+fig.update_yaxes(
+    title_text="Gordura (%)",
+    color="#D45F50",
+    secondary_y=True,
+    fixedrange=True,
+)
 
-# Segunda linha de métricas — 3 colunas
-r2c1, r2c2, r2c3 = st.columns(3, gap="small")
-
-with r2c1:
-    st.html(
-        html_block(f"""
-<div class="metric-card metric-honey">
-    <div class="metric-name">Água</div>
-    <div class="metric-value">{fmt_num(DATA_ATUAL["agua"], 1)}<span class="metric-unit">%</span></div>
-    <span class="tag {status_class(agua_status)}">{agua_status}</span>
-</div>
-""")
-    )
-
-with r2c2:
-    st.html(
-        html_block(f"""
-<div class="metric-card metric-blue">
-    <div class="metric-name">Visceral</div>
-    <div class="metric-value">{fmt_num(DATA_ATUAL["visceral"], 1)}<span class="metric-unit"></span></div>
-    <span class="tag {status_class(visceral_status)}">{visceral_status}</span>
-</div>
-""")
-    )
-
-with r2c3:
-    st.html(
-        html_block(f"""
-<div class="metric-card metric-brown">
-    <div class="metric-name">Proteína</div>
-    <div class="metric-value">{fmt_num(DATA_ATUAL["proteina"], 1)}<span class="metric-unit">%</span></div>
-    <span class="tag {status_class(proteina_status)}">{proteina_status}</span>
-</div>
-""")
-    )
+st.plotly_chart(
+    fig,
+    use_container_width=True,
+    config={
+        "displayModeBar": False,
+        "scrollZoom": False,
+        "doubleClick": False,
+        "showTips": False,
+        "staticPlot": True,
+    },
+)
 
 # -----------------------------------------------------------------------------
 # METAS
@@ -904,81 +900,6 @@ Máximo 3 blocos curtos.
         st.rerun()
     except Exception as e:
         st.error(f"Erro ao chamar Claude: {e}")
-
-# -----------------------------------------------------------------------------
-# CHART
-# -----------------------------------------------------------------------------
-fig = make_subplots(specs=[[{"secondary_y": True}]])
-fig.add_trace(
-    go.Scatter(
-        x=historico["data_medicao"],
-        y=historico["peso"],
-        name="Peso",
-        mode="lines+markers",
-        line=dict(color="#4AADA0", width=3, shape="spline", smoothing=1.1),
-        marker=dict(size=6, color="#4AADA0"),
-    ),
-    secondary_y=False,
-)
-fig.add_trace(
-    go.Scatter(
-        x=historico["data_medicao"],
-        y=[DATA_ATUAL["meta_peso"]] * len(historico),
-        name="Meta Peso",
-        mode="lines",
-        line=dict(color="#B07D3A", width=2, dash="dash"),
-        opacity=0.9,
-    ),
-    secondary_y=False,
-)
-fig.add_trace(
-    go.Scatter(
-        x=historico["data_medicao"],
-        y=historico["gordura"],
-        name="Gordura",
-        mode="lines+markers",
-        line=dict(color="#D45F50", width=3, shape="spline", smoothing=1.1),
-        marker=dict(size=6, color="#D45F50"),
-    ),
-    secondary_y=True,
-)
-fig.add_trace(
-    go.Scatter(
-        x=historico["data_medicao"],
-        y=[DATA_ATUAL["meta_gordura"]] * len(historico),
-        name="Meta Gordura",
-        mode="lines",
-        line=dict(color="#B07D3A", width=2, dash="dash"),
-        opacity=0.9,
-    ),
-    secondary_y=True,
-)
-fig.add_trace(
-    go.Scatter(
-        x=historico["data_medicao"],
-        y=historico["musculo"],
-        name="Músculo",
-        mode="lines+markers",
-        line=dict(color="#5FA04E", width=3, shape="spline", smoothing=1.1),
-        marker=dict(size=6, color="#5FA04E"),
-    ),
-    secondary_y=False,
-)
-
-fig.update_layout(
-    title=dict(text="Evolução da composição", x=0.01, xanchor="left", font=dict(size=28)),
-    height=440,
-    paper_bgcolor="#FDFAF5",
-    plot_bgcolor="#FDFAF5",
-    margin=dict(l=20, r=20, t=70, b=20),
-    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0),
-    font=dict(color="#2C2A26"),
-)
-fig.update_xaxes(showgrid=False, tickformat="%d/%m", color="#9A9590", zeroline=False)
-fig.update_yaxes(title_text="Peso / Músculo (kg)", color="#9A9590", secondary_y=False)
-fig.update_yaxes(title_text="Gordura (%)", color="#D45F50", secondary_y=True)
-
-st.plotly_chart(fig, use_container_width=True, config={"displayModeBar": False})
 
 # -----------------------------------------------------------------------------
 # HISTÓRICO CURTO
