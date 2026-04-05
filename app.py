@@ -835,6 +835,45 @@ body, .stApp { font-family: 'DM Sans', sans-serif; color: var(--text); }
 /* ── Stagnation insight ── */
 .stag-insight { border-left: 4px solid #D45F50; }
 
+/* ── Tab Gráficos ── */
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 6px;
+}
+.chart-title {
+  font-family: 'DM Serif Display', serif;
+  font-size: 1.55rem;
+  color: var(--text);
+  margin: 0;
+}
+.chart-sub {
+  color: var(--muted);
+  font-size: .88rem;
+}
+.chart-wrap {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 18px 10px 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 2px 12px rgba(44,42,38,.03);
+}
+.stat-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.stat-pill {
+  font-size: .88rem;
+  color: var(--muted);
+}
+.stat-pill strong { color: var(--text); }
+
 /* ── Mi Fitness OCR ── */
 .mifitness-card {
   background: linear-gradient(135deg, #1A1A2E 0%, #16213E 100%);
@@ -991,7 +1030,7 @@ else:
 # -----------------------------------------------------------------------------
 # TABS PRINCIPAIS
 # -----------------------------------------------------------------------------
-tab_corpo, tab_nutri = st.tabs(["📊  Composição Corporal", "🥩  Nutrição & Treino"])
+tab_corpo, tab_nutri, tab_graficos = st.tabs(["📊  Composição Corporal", "🥩  Nutrição & Treino", "📈  Gráficos"])
 
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1848,3 +1887,518 @@ with tab_nutri:
 
     else:
         st.info("Nenhum registro de nutrição ainda. Use o formulário acima para começar.")
+
+
+# ═════════════════════════════════════════════════════════════════════════════
+# TAB 3 — GRÁFICOS
+# ═════════════════════════════════════════════════════════════════════════════
+with tab_graficos:
+
+    # Paleta e config base reutilizável
+    BG     = "#FDFAF5"
+    GRID   = "#EEE9DF"
+    MUTED  = "#9A9590"
+    TEXT   = "#2C2A26"
+    TEAL   = "#4AADA0"
+    CORAL  = "#D45F50"
+    SAGE   = "#5FA04E"
+    HONEY  = "#D4A84B"
+    BLUE   = "#5BA8C4"
+    BROWN  = "#C4A882"
+    VIOLET = "#9B72CF"
+
+    NO_ZOOM = {
+        "displayModeBar": False,
+        "scrollZoom": False,
+        "doubleClick": False,
+        "showTips": False,
+    }
+
+    def base_layout(title="", height=320, show_legend=True):
+        return dict(
+            title=dict(text=title, x=0.01, xanchor="left", font=dict(size=20, color=TEXT, family="DM Serif Display")),
+            height=height,
+            paper_bgcolor=BG, plot_bgcolor=BG,
+            margin=dict(l=10, r=10, t=title and 52 or 20, b=10),
+            font=dict(color=TEXT, family="DM Sans"),
+            showlegend=show_legend,
+            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1.0, font=dict(size=12)),
+            hovermode="x unified",
+            dragmode=False,
+        )
+
+    def base_xaxis():
+        return dict(showgrid=False, tickformat="%d/%m", color=MUTED, zeroline=False, fixedrange=True)
+
+    def base_yaxis(**kwargs):
+        return dict(showgrid=True, gridcolor=GRID, color=MUTED, zeroline=False, fixedrange=True, **kwargs)
+
+    # ── Dados disponíveis ──────────────────────────────────────────────────────
+    df_graf = df_db.copy() if not df_db.empty else historico.copy()
+    # garante que historico tem colunas extras se vier do mock
+    for col in ["agua", "visceral", "proteina", "massa_ossea", "imc", "basal", "score"]:
+        if col not in df_graf.columns:
+            df_graf[col] = None
+
+    df_graf = df_graf.sort_values("data_medicao")
+    df_ativ_g = load_atividade_df().sort_values("data_log") if True else pd.DataFrame()
+    df_nutri_g = load_nutri_df().sort_values("data_log") if True else pd.DataFrame()
+
+    x_comp = df_graf["data_medicao"]
+    x_ativ = df_ativ_g["data_log"] if not df_ativ_g.empty else pd.Series([], dtype="datetime64[ns]")
+    x_nutr = df_nutri_g["data_log"] if not df_nutri_g.empty else pd.Series([], dtype="datetime64[ns]")
+
+    tem_comp   = not df_graf.empty
+    tem_ativ   = not df_ativ_g.empty
+    tem_nutri  = not df_nutri_g.empty
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # LINHA 1 — Peso | Gordura + Músculo
+    # ─────────────────────────────────────────────────────────────────────────
+    g1, g2 = st.columns(2, gap="medium")
+
+    # G1 — Peso
+    with g1:
+        fig = go.Figure()
+        if tem_comp:
+            fig.add_trace(go.Scatter(
+                x=x_comp, y=df_graf["peso"],
+                name="Peso", mode="lines+markers",
+                line=dict(color=TEAL, width=3, shape="spline", smoothing=1.2),
+                marker=dict(size=6, color=TEAL, line=dict(width=2, color=BG)),
+                fill="tozeroy", fillcolor="rgba(74,173,160,.08)",
+            ))
+            fig.add_trace(go.Scatter(
+                x=x_comp, y=[DATA_ATUAL["meta_peso"]] * len(x_comp),
+                name="Meta", mode="lines",
+                line=dict(color=HONEY, width=2, dash="dash"), opacity=.8,
+            ))
+            if datas_proj_peso:
+                fig.add_trace(go.Scatter(
+                    x=datas_proj_peso, y=vals_proj_peso,
+                    name="Projeção", mode="lines",
+                    line=dict(color=TEAL, width=2, dash="dot"), opacity=.45,
+                ))
+        fig.update_layout(**base_layout("Peso corporal", 300))
+        fig.update_xaxes(**base_xaxis())
+        fig.update_yaxes(**base_yaxis(title_text="kg"))
+
+        delta_str = f"+{fmt_num(delta_peso_total,1)}" if delta_peso_total > 0 else fmt_num(delta_peso_total,1)
+        st.html(html_block(f"""
+<div class="chart-wrap">
+  <div class="chart-header">
+    <span class="chart-title">⚖️ Peso</span>
+    <span class="chart-sub">{fmt_num(DATA_ATUAL['peso'],1)} kg</span>
+  </div>
+"""))
+        st.plotly_chart(fig, use_container_width=True, config=NO_ZOOM)
+        st.html(html_block(f"""
+  <div class="stat-row">
+    <span class="stat-pill">Δ total <strong>{delta_str} kg</strong></span>
+    <span class="stat-pill">Meta <strong>{fmt_num(DATA_ATUAL['meta_peso'],0)} kg</strong></span>
+    <span class="stat-pill">Faltam <strong>+{fmt_num(DATA_ATUAL['meta_peso']-DATA_ATUAL['peso'],1)} kg</strong></span>
+  </div>
+</div>
+"""))
+
+    # G2 — Gordura + Músculo eixo duplo
+    with g2:
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        if tem_comp:
+            fig.add_trace(go.Scatter(
+                x=x_comp, y=df_graf["gordura"],
+                name="Gordura %", mode="lines+markers",
+                line=dict(color=CORAL, width=3, shape="spline", smoothing=1.2),
+                marker=dict(size=6, color=CORAL, line=dict(width=2, color=BG)),
+                fill="tozeroy", fillcolor="rgba(212,95,80,.07)",
+            ), secondary_y=False)
+            fig.add_trace(go.Scatter(
+                x=x_comp, y=[DATA_ATUAL["meta_gordura"]] * len(x_comp),
+                name="Meta gord.", mode="lines",
+                line=dict(color=HONEY, width=2, dash="dash"), opacity=.8,
+            ), secondary_y=False)
+            fig.add_trace(go.Scatter(
+                x=x_comp, y=df_graf["musculo"],
+                name="Músculo kg", mode="lines+markers",
+                line=dict(color=SAGE, width=3, shape="spline", smoothing=1.2),
+                marker=dict(size=6, color=SAGE, line=dict(width=2, color=BG)),
+            ), secondary_y=True)
+        fig.update_layout(**base_layout("Gordura & Músculo", 300))
+        fig.update_xaxes(**base_xaxis())
+        fig.update_yaxes(**base_yaxis(title_text="Gordura (%)"), secondary_y=False)
+        fig.update_yaxes(**base_yaxis(title_text="Músculo (kg)", showgrid=False), secondary_y=True)
+
+        delta_g = f"{fmt_num(delta_gordura,1)} pp"
+        delta_m = f"+{fmt_num(delta_musculo,1)} kg" if delta_musculo > 0 else f"{fmt_num(delta_musculo,1)} kg"
+        st.html(html_block(f"""
+<div class="chart-wrap">
+  <div class="chart-header">
+    <span class="chart-title">🔬 Composição</span>
+    <span class="chart-sub">{fmt_num(DATA_ATUAL['gordura'],1)}% gord · {fmt_num(DATA_ATUAL['musculo'],1)} kg musc</span>
+  </div>
+"""))
+        st.plotly_chart(fig, use_container_width=True, config=NO_ZOOM)
+        st.html(html_block(f"""
+  <div class="stat-row">
+    <span class="stat-pill">Δ gordura <strong>{delta_g}</strong></span>
+    <span class="stat-pill">Δ músculo <strong>{delta_m}</strong></span>
+    <span class="stat-pill">Meta <strong>{fmt_num(DATA_ATUAL['meta_gordura'],0)}%</strong></span>
+  </div>
+</div>
+"""))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # LINHA 2 — Água & Visceral | Proteína & IMC
+    # ─────────────────────────────────────────────────────────────────────────
+    g3, g4 = st.columns(2, gap="medium")
+
+    with g3:
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        if tem_comp and "agua" in df_graf.columns:
+            agua_vals = pd.to_numeric(df_graf["agua"], errors="coerce")
+            visc_vals = pd.to_numeric(df_graf["visceral"], errors="coerce")
+            fig.add_trace(go.Scatter(
+                x=x_comp, y=agua_vals,
+                name="Água %", mode="lines+markers",
+                line=dict(color=BLUE, width=3, shape="spline", smoothing=1.2),
+                marker=dict(size=6, color=BLUE, line=dict(width=2, color=BG)),
+                fill="tozeroy", fillcolor="rgba(91,168,196,.09)",
+            ), secondary_y=False)
+            fig.add_trace(go.Scatter(
+                x=x_comp, y=visc_vals,
+                name="Visceral", mode="lines+markers",
+                line=dict(color=CORAL, width=2.5, shape="spline", smoothing=1.2),
+                marker=dict(size=5, color=CORAL),
+            ), secondary_y=True)
+        fig.update_layout(**base_layout("Hidratação & Visceral", 280))
+        fig.update_xaxes(**base_xaxis())
+        fig.update_yaxes(**base_yaxis(title_text="Água (%)"), secondary_y=False)
+        fig.update_yaxes(**base_yaxis(title_text="Visceral", showgrid=False), secondary_y=True)
+
+        agua_v  = fmt_num(DATA_ATUAL["agua"],1) if DATA_ATUAL["agua"] else "—"
+        visc_v  = fmt_num(DATA_ATUAL["visceral"],0) if DATA_ATUAL["visceral"] else "—"
+        st.html(html_block(f"""
+<div class="chart-wrap">
+  <div class="chart-header">
+    <span class="chart-title">💧 Hidratação</span>
+    <span class="chart-sub">Água {agua_v}% · Visceral {visc_v}</span>
+  </div>
+"""))
+        st.plotly_chart(fig, use_container_width=True, config=NO_ZOOM)
+        st.html(html_block(f"""
+  <div class="stat-row">
+    <span class="stat-pill">Água ideal <strong>≥ 52%</strong></span>
+    <span class="stat-pill">Visceral ideal <strong>≤ 12</strong></span>
+  </div>
+</div>
+"""))
+
+    with g4:
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        if tem_comp and "proteina" in df_graf.columns:
+            prot_vals = pd.to_numeric(df_graf["proteina"], errors="coerce")
+            imc_vals  = pd.to_numeric(df_graf["imc"],      errors="coerce")
+            fig.add_trace(go.Scatter(
+                x=x_comp, y=prot_vals,
+                name="Proteína %", mode="lines+markers",
+                line=dict(color=BROWN, width=3, shape="spline", smoothing=1.2),
+                marker=dict(size=6, color=BROWN, line=dict(width=2, color=BG)),
+                fill="tozeroy", fillcolor="rgba(196,168,130,.09)",
+            ), secondary_y=False)
+            fig.add_trace(go.Scatter(
+                x=x_comp, y=imc_vals,
+                name="IMC", mode="lines+markers",
+                line=dict(color=VIOLET, width=2.5, shape="spline", smoothing=1.2),
+                marker=dict(size=5, color=VIOLET),
+            ), secondary_y=True)
+        fig.update_layout(**base_layout("Proteína corporal & IMC", 280))
+        fig.update_xaxes(**base_xaxis())
+        fig.update_yaxes(**base_yaxis(title_text="Proteína (%)"), secondary_y=False)
+        fig.update_yaxes(**base_yaxis(title_text="IMC", showgrid=False), secondary_y=True)
+
+        prot_v = fmt_num(DATA_ATUAL["proteina"],1) if DATA_ATUAL["proteina"] else "—"
+        imc_v  = fmt_num(DATA_ATUAL["imc"],1)      if DATA_ATUAL["imc"]      else "—"
+        st.html(html_block(f"""
+<div class="chart-wrap">
+  <div class="chart-header">
+    <span class="chart-title">🧬 Proteína & IMC</span>
+    <span class="chart-sub">Proteína {prot_v}% · IMC {imc_v}</span>
+  </div>
+"""))
+        st.plotly_chart(fig, use_container_width=True, config=NO_ZOOM)
+        st.html(html_block(f"""
+  <div class="stat-row">
+    <span class="stat-pill">Proteína ideal <strong>≥ 18%</strong></span>
+    <span class="stat-pill">IMC atual <strong>{imc_v}</strong></span>
+  </div>
+</div>
+"""))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # LINHA 3 — Score Recomposição | Metabolismo basal
+    # ─────────────────────────────────────────────────────────────────────────
+    g5, g6 = st.columns(2, gap="medium")
+
+    with g5:
+        fig = go.Figure()
+        if tem_comp and "score" in df_graf.columns:
+            score_vals = pd.to_numeric(df_graf["score"], errors="coerce").dropna()
+            score_x    = df_graf.loc[score_vals.index, "data_medicao"]
+            if not score_vals.empty:
+                fig.add_trace(go.Scatter(
+                    x=score_x, y=score_vals,
+                    name="Score", mode="lines+markers",
+                    line=dict(color=HONEY, width=3, shape="spline", smoothing=1.2),
+                    marker=dict(size=7, color=HONEY, line=dict(width=2, color=BG)),
+                    fill="tozeroy", fillcolor="rgba(212,168,75,.10)",
+                ))
+                # banda de referência 60-80
+                fig.add_hrect(y0=60, y1=80, fillcolor="rgba(95,160,78,.08)",
+                              line_width=0, annotation_text="Ótimo",
+                              annotation_position="top right",
+                              annotation_font=dict(color=SAGE, size=11))
+        fig.update_layout(**base_layout("Score de recomposição", 280))
+        fig.update_xaxes(**base_xaxis())
+        fig.update_yaxes(**base_yaxis(range=[0, 100], title_text="Score (0-100)"))
+
+        score_v = int(round(DATA_ATUAL["score"])) if DATA_ATUAL["score"] else "—"
+        st.html(html_block(f"""
+<div class="chart-wrap">
+  <div class="chart-header">
+    <span class="chart-title">🏆 Score Recomp.</span>
+    <span class="chart-sub">Atual: {score_v} / 100</span>
+  </div>
+"""))
+        st.plotly_chart(fig, use_container_width=True, config=NO_ZOOM)
+        st.html(html_block(f"""
+  <div class="stat-row">
+    <span class="stat-pill">Zona ideal <strong>60–80</strong></span>
+    <span class="stat-pill">Componentes: gordura · visceral · músculo</span>
+  </div>
+</div>
+"""))
+
+    with g6:
+        fig = go.Figure()
+        if tem_comp and "basal" in df_graf.columns:
+            basal_vals = pd.to_numeric(df_graf["basal"], errors="coerce").dropna()
+            basal_x    = df_graf.loc[basal_vals.index, "data_medicao"]
+            if not basal_vals.empty:
+                fig.add_trace(go.Scatter(
+                    x=basal_x, y=basal_vals,
+                    name="TMB", mode="lines+markers",
+                    line=dict(color=VIOLET, width=3, shape="spline", smoothing=1.2),
+                    marker=dict(size=6, color=VIOLET, line=dict(width=2, color=BG)),
+                    fill="tozeroy", fillcolor="rgba(155,114,207,.09)",
+                ))
+        fig.update_layout(**base_layout("Metabolismo basal (TMB)", 280))
+        fig.update_xaxes(**base_xaxis())
+        fig.update_yaxes(**base_yaxis(title_text="kcal/dia"))
+
+        basal_v = int(DATA_ATUAL["basal"]) if DATA_ATUAL["basal"] else "—"
+        st.html(html_block(f"""
+<div class="chart-wrap">
+  <div class="chart-header">
+    <span class="chart-title">🔋 Metabolismo basal</span>
+    <span class="chart-sub">{basal_v} kcal/dia</span>
+  </div>
+"""))
+        st.plotly_chart(fig, use_container_width=True, config=NO_ZOOM)
+        st.html(html_block(f"""
+  <div class="stat-row">
+    <span class="stat-pill">Sobe com músculo, cai com gordura</span>
+  </div>
+</div>
+"""))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # LINHA 4 — Calorias ativas | Passos diários
+    # ─────────────────────────────────────────────────────────────────────────
+    if tem_ativ:
+        g7, g8 = st.columns(2, gap="medium")
+
+        with g7:
+            fig = go.Figure()
+            fig.add_trace(go.Bar(
+                x=df_ativ_g["data_log"],
+                y=df_ativ_g["calorias_ativas"],
+                name="Cal. ativas",
+                marker=dict(
+                    color=df_ativ_g["calorias_ativas"],
+                    colorscale=[[0, "rgba(212,95,80,.4)"], [1, CORAL]],
+                    showscale=False,
+                    line=dict(width=0),
+                ),
+            ))
+            fig.update_layout(**base_layout("Calorias ativas diárias", 280, show_legend=False))
+            fig.update_xaxes(**base_xaxis())
+            fig.update_yaxes(**base_yaxis(title_text="kcal"))
+            fig.update_traces(marker_cornerradius=4)
+
+            cal_media = df_ativ_g["calorias_ativas"].mean()
+            cal_max   = df_ativ_g["calorias_ativas"].max()
+            st.html(html_block(f"""
+<div class="chart-wrap">
+  <div class="chart-header">
+    <span class="chart-title">🔥 Calorias ativas</span>
+    <span class="chart-sub">Hoje: {int(cal_ativas_hoje)} kcal</span>
+  </div>
+"""))
+            st.plotly_chart(fig, use_container_width=True, config=NO_ZOOM)
+            st.html(html_block(f"""
+  <div class="stat-row">
+    <span class="stat-pill">Média <strong>{int(cal_media)} kcal</strong></span>
+    <span class="stat-pill">Máx <strong>{int(cal_max)} kcal</strong></span>
+  </div>
+</div>
+"""))
+
+        with g8:
+            fig = go.Figure()
+            cores_passos = [
+                SAGE if (v or 0) >= 8000 else HONEY if (v or 0) >= 5000 else CORAL
+                for v in df_ativ_g["passos"]
+            ]
+            fig.add_trace(go.Bar(
+                x=df_ativ_g["data_log"],
+                y=df_ativ_g["passos"],
+                name="Passos",
+                marker=dict(color=cores_passos, line=dict(width=0)),
+            ))
+            fig.add_trace(go.Scatter(
+                x=df_ativ_g["data_log"],
+                y=[8000] * len(df_ativ_g),
+                name="Meta 8.000", mode="lines",
+                line=dict(color=HONEY, dash="dash", width=2), opacity=.8,
+            ))
+            fig.update_layout(**base_layout("Passos diários", 280))
+            fig.update_xaxes(**base_xaxis())
+            fig.update_yaxes(**base_yaxis(title_text="passos"))
+            fig.update_traces(marker_cornerradius=4, selector=dict(type="bar"))
+
+            media_passos = df_ativ_g["passos"].mean()
+            dias_meta    = (df_ativ_g["passos"] >= 8000).sum()
+            st.html(html_block(f"""
+<div class="chart-wrap">
+  <div class="chart-header">
+    <span class="chart-title">👟 Passos diários</span>
+    <span class="chart-sub">Hoje: {passos_hoje:,}</span>
+  </div>
+"""))
+            st.plotly_chart(fig, use_container_width=True, config=NO_ZOOM)
+            st.html(html_block(f"""
+  <div class="stat-row">
+    <span class="stat-pill">Média <strong>{int(media_passos):,}</strong></span>
+    <span class="stat-pill">Dias acima da meta <strong>{dias_meta}</strong></span>
+  </div>
+</div>
+"""))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # LINHA 5 — Proteína ingerida | Calorias nutrição (full width)
+    # ─────────────────────────────────────────────────────────────────────────
+    if tem_nutri:
+        META_PROT_G2 = round(DATA_ATUAL["peso"] * 2)
+
+        fig_np = go.Figure()
+        fig_np.add_trace(go.Bar(
+            x=df_nutri_g["data_log"],
+            y=df_nutri_g["proteina_g"],
+            name="Proteína",
+            marker=dict(
+                color=df_nutri_g["proteina_g"],
+                colorscale=[[0, "rgba(74,173,160,.35)"], [1, TEAL]],
+                showscale=False, line=dict(width=0),
+            ),
+        ))
+        fig_np.add_trace(go.Scatter(
+            x=df_nutri_g["data_log"],
+            y=[META_PROT_G2] * len(df_nutri_g),
+            name=f"Meta {META_PROT_G2} g", mode="lines",
+            line=dict(color=HONEY, dash="dash", width=2), opacity=.8,
+        ))
+        fig_np.add_trace(go.Scatter(
+            x=df_nutri_g["data_log"],
+            y=df_nutri_g["calorias_kcal"],
+            name="Calorias (kcal)", mode="lines+markers",
+            line=dict(color=CORAL, width=2.5),
+            marker=dict(size=5, color=CORAL),
+            yaxis="y2",
+        ))
+        fig_np.update_layout(
+            **base_layout("Proteína ingerida & Calorias nutricionais", 320),
+            yaxis=dict(title_text="Proteína (g)", color=TEAL, showgrid=True,
+                       gridcolor=GRID, fixedrange=True),
+            yaxis2=dict(title_text="Calorias (kcal)", overlaying="y", side="right",
+                        color=CORAL, showgrid=False, fixedrange=True),
+        )
+        fig_np.update_xaxes(**base_xaxis())
+        fig_np.update_traces(marker_cornerradius=4, selector=dict(type="bar"))
+
+        prot_media = df_nutri_g["proteina_g"].mean()
+        cal_media_n = df_nutri_g["calorias_kcal"].mean()
+        dias_ok_prot = (df_nutri_g["proteina_g"] >= META_PROT_G2).sum()
+
+        st.html(html_block(f"""
+<div class="chart-wrap">
+  <div class="chart-header">
+    <span class="chart-title">🥩 Nutrição — Proteína & Calorias</span>
+    <span class="chart-sub">Meta {META_PROT_G2} g/dia</span>
+  </div>
+"""))
+        st.plotly_chart(fig_np, use_container_width=True, config=NO_ZOOM)
+        st.html(html_block(f"""
+  <div class="stat-row">
+    <span class="stat-pill">Média proteína <strong>{int(prot_media)} g</strong></span>
+    <span class="stat-pill">Média calorias <strong>{int(cal_media_n)} kcal</strong></span>
+    <span class="stat-pill">Dias na meta <strong>{dias_ok_prot}</strong></span>
+  </div>
+</div>
+"""))
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # LINHA 6 — Movimento (min) — full width
+    # ─────────────────────────────────────────────────────────────────────────
+    if tem_ativ and not df_ativ_g["minutos_movimento"].isna().all():
+        fig_mov = go.Figure()
+        fig_mov.add_trace(go.Scatter(
+            x=df_ativ_g["data_log"],
+            y=df_ativ_g["minutos_movimento"],
+            name="Movimento", mode="lines+markers",
+            line=dict(color=SAGE, width=3, shape="spline", smoothing=1.2),
+            marker=dict(size=7, color=SAGE, line=dict(width=2, color=BG)),
+            fill="tozeroy", fillcolor="rgba(95,160,78,.10)",
+        ))
+        fig_mov.add_trace(go.Scatter(
+            x=df_ativ_g["data_log"],
+            y=[30] * len(df_ativ_g),
+            name="Meta 30 min", mode="lines",
+            line=dict(color=HONEY, dash="dash", width=2), opacity=.8,
+        ))
+        fig_mov.update_layout(**base_layout("Minutos de movimento diário", 260))
+        fig_mov.update_xaxes(**base_xaxis())
+        fig_mov.update_yaxes(**base_yaxis(title_text="min"))
+
+        media_mov = df_ativ_g["minutos_movimento"].mean()
+        dias_ok_mov = (df_ativ_g["minutos_movimento"] >= 30).sum()
+
+        st.html(html_block(f"""
+<div class="chart-wrap">
+  <div class="chart-header">
+    <span class="chart-title">⏱ Minutos de movimento</span>
+    <span class="chart-sub">Meta: 30 min/dia</span>
+  </div>
+"""))
+        st.plotly_chart(fig_mov, use_container_width=True, config=NO_ZOOM)
+        st.html(html_block(f"""
+  <div class="stat-row">
+    <span class="stat-pill">Média <strong>{int(media_mov)} min</strong></span>
+    <span class="stat-pill">Dias na meta <strong>{dias_ok_mov}</strong></span>
+  </div>
+</div>
+"""))
+
+    # Fallback quando não há dados de atividade/nutrição
+    if not tem_ativ and not tem_nutri:
+        st.info("Registre atividade no Mi Fitness e nutrição na aba Nutrição & Treino para ver os gráficos completos.")
+
