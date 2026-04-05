@@ -1,5 +1,4 @@
-import math
-from datetime import datetime
+from textwrap import dedent
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -17,9 +16,43 @@ st.set_page_config(
     initial_sidebar_state="collapsed",
 )
 
+
+# -----------------------------------------------------------------------------
+# HELPERS
+# -----------------------------------------------------------------------------
+def html_block(content: str) -> str:
+    return dedent(content).strip()
+
+
+def fmt_num(valor: float, casas: int = 1) -> str:
+    return f"{valor:.{casas}f}".replace(".", ",")
+
+
+def progresso_peso(atual: float, minimo: float, meta: float) -> float:
+    if meta <= minimo:
+        return 0.0
+    return max(0.0, min(1.0, (atual - minimo) / (meta - minimo)))
+
+
+def progresso_gordura(inicial: float, atual: float, meta: float) -> float:
+    total = inicial - meta
+    feito = inicial - atual
+    if total <= 0:
+        return 0.0
+    return max(0.0, min(1.0, feito / total))
+
+
+def status_class(status: str) -> str:
+    s = status.lower().strip()
+    if s in ["boa", "bom", "normal", "ok"]:
+        return "tag-ok"
+    if s in ["alta", "insuf.", "insuficiente", "ruim"]:
+        return "tag-hi"
+    return "tag-mid"
+
+
 # -----------------------------------------------------------------------------
 # DADOS EXEMPLO
-# Troque depois pelos seus dados reais / banco / Zepp
 # -----------------------------------------------------------------------------
 DATA_ATUAL = {
     "peso": 91.6,
@@ -114,38 +147,12 @@ historico_lista = [
 
 
 # -----------------------------------------------------------------------------
-# HELPERS
+# DERIVADOS
 # -----------------------------------------------------------------------------
-def fmt_num(valor: float, casas: int = 1) -> str:
-    return f"{valor:.{casas}f}".replace(".", ",")
-
-
-def progresso_peso(atual: float, minimo: float, meta: float) -> float:
-    if meta <= minimo:
-        return 0.0
-    return max(0.0, min(1.0, (atual - minimo) / (meta - minimo)))
-
-
-def progresso_gordura(inicial: float, atual: float, meta: float) -> float:
-    total = inicial - meta
-    feito = inicial - atual
-    if total <= 0:
-        return 0.0
-    return max(0.0, min(1.0, feito / total))
-
-
-def status_class(status: str) -> str:
-    s = status.lower()
-    if s in ["boa", "normal", "ok", "bom"]:
-        return "tag-ok"
-    if s in ["alta", "insuf.", "insuficiente", "ruim"]:
-        return "tag-hi"
-    return "tag-mid"
-
-
 peso_prog = progresso_peso(
     DATA_ATUAL["peso"], DATA_ATUAL["peso_min"], DATA_ATUAL["meta_peso"]
 )
+
 gordura_prog = progresso_gordura(
     DATA_ATUAL["gordura_inicial"],
     DATA_ATUAL["gordura"],
@@ -154,6 +161,7 @@ gordura_prog = progresso_gordura(
 
 delta_gordura = DATA_ATUAL["gordura"] - DATA_ATUAL["gordura_inicial"]
 delta_musculo = DATA_ATUAL["musculo"] - DATA_ATUAL["musculo_inicial"]
+
 ritmo_peso_sem = DATA_ATUAL["delta_peso_total"] / (DATA_ATUAL["dias_periodo"] / 7)
 ritmo_gordura_sem = delta_gordura / (DATA_ATUAL["dias_periodo"] / 7)
 
@@ -170,7 +178,7 @@ mes_abrev = "ABR 2026"
 # CSS
 # -----------------------------------------------------------------------------
 st.markdown(
-    """
+    html_block("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;700&display=swap');
 
@@ -189,21 +197,26 @@ st.markdown(
   --brown:#C4A882;
   --radius:18px;
 }
-html, body, [data-testid="stAppViewContainer"] {
+
+html, body, .stApp {
   background: var(--bg);
 }
+
 body, .stApp {
   font-family: 'DM Sans', sans-serif;
   color: var(--text);
 }
+
 .block-container {
   padding-top: 1.8rem;
   padding-bottom: 3rem;
   max-width: 1180px;
 }
+
 [data-testid="stHeader"]{
   background: transparent;
 }
+
 [data-testid="stToolbar"]{
   right: 1rem;
 }
@@ -232,6 +245,7 @@ h1,h2,h3,h4 {
   gap: 16px;
   margin-bottom: 8px;
 }
+
 .page-title {
   font-family:'DM Serif Display', serif;
   font-size: clamp(2rem, 3vw, 3.5rem);
@@ -239,10 +253,12 @@ h1,h2,h3,h4 {
   color: var(--text);
   margin:0;
 }
+
 .page-title em {
   color: var(--coral);
   font-style: italic;
 }
+
 .date-badge {
   font-size: .85rem;
   font-weight:700;
@@ -254,6 +270,7 @@ h1,h2,h3,h4 {
   text-transform: uppercase;
   letter-spacing: .06em;
 }
+
 .subtitle {
   color: var(--muted);
   font-size: 1rem;
@@ -274,25 +291,30 @@ h1,h2,h3,h4 {
   margin-bottom: 18px;
   box-shadow: 0 10px 24px rgba(44,42,38,.12);
 }
+
 .banner-left {
   display:flex;
   gap:14px;
   align-items:flex-start;
 }
+
 .banner-icon {
   font-size: 1.8rem;
   line-height:1;
 }
+
 .banner-title {
   font-family:'DM Serif Display', serif;
   font-size: 1.85rem;
   margin-bottom: 4px;
 }
+
 .banner-sub {
   color: rgba(245,242,236,0.68);
   font-size: 1rem;
   line-height: 1.5;
 }
+
 .banner-chip {
   background: var(--honey);
   color: var(--text);
@@ -320,6 +342,7 @@ h1,h2,h3,h4 {
   position: relative;
   overflow: hidden;
 }
+
 .score-card::before{
   content:'';
   position:absolute;
@@ -329,18 +352,21 @@ h1,h2,h3,h4 {
   opacity: .14;
   border-radius: 50%;
 }
+
 .score-label {
   font-size: .95rem;
   text-transform: uppercase;
   letter-spacing: .10em;
   opacity: .65;
 }
+
 .score-num {
   font-family:'DM Serif Display', serif;
   font-size: 6rem;
   line-height: 1;
   margin-top: 12px;
 }
+
 .score-delta {
   color: #65d0c2;
   font-size: 1.6rem;
@@ -354,12 +380,14 @@ h1,h2,h3,h4 {
   overflow:hidden;
   min-height: 108px;
 }
+
 .metric-card::after{
   content:'';
   position:absolute;
   left:0; right:0; bottom:0;
   height:4px;
 }
+
 .metric-teal::after{background:var(--teal);}
 .metric-coral::after{background:var(--coral);}
 .metric-sage::after{background:var(--sage);}
@@ -374,6 +402,7 @@ h1,h2,h3,h4 {
   letter-spacing: .06em;
   font-weight: 700;
 }
+
 .metric-value {
   font-family:'DM Serif Display', serif;
   color: var(--text);
@@ -381,12 +410,14 @@ h1,h2,h3,h4 {
   line-height:1.1;
   margin-top: 4px;
 }
+
 .metric-unit {
   font-family:'DM Sans', sans-serif;
   font-size: 1.1rem;
   color: var(--muted);
   font-weight: 400;
 }
+
 .tag {
   display:inline-block;
   margin-top: 8px;
@@ -395,6 +426,7 @@ h1,h2,h3,h4 {
   font-size: .86rem;
   font-weight: 700;
 }
+
 .tag-ok{ background:#E6F4EC; color:#4A9A5E; }
 .tag-hi{ background:#FDECEA; color:#C0503F; }
 .tag-mid{ background:#FFF8E8; color:#A07830; }
@@ -403,6 +435,7 @@ h1,h2,h3,h4 {
   padding: 22px;
   min-height: 270px;
 }
+
 .meta-top {
   display:flex;
   justify-content:space-between;
@@ -410,6 +443,7 @@ h1,h2,h3,h4 {
   gap: 12px;
   margin-bottom: 16px;
 }
+
 .meta-label {
   color: var(--muted);
   text-transform: uppercase;
@@ -417,12 +451,14 @@ h1,h2,h3,h4 {
   font-size: .82rem;
   font-weight: 700;
 }
+
 .meta-title {
   font-family:'DM Serif Display', serif;
   font-size: 1.9rem;
   line-height:1.2;
   margin-top: 4px;
 }
+
 .meta-chip {
   padding: 7px 12px;
   border-radius: 999px;
@@ -430,6 +466,7 @@ h1,h2,h3,h4 {
   font-weight: 700;
   white-space: nowrap;
 }
+
 .chip-peso{ background:#E0F4F2; color:#2A7A72; }
 .chip-gordura{ background:#FDECEA; color:#A03828; }
 
@@ -440,7 +477,9 @@ h1,h2,h3,h4 {
   font-size: .95rem;
   margin-bottom: 8px;
 }
+
 .meta-progress-labels strong{ color: var(--text); }
+
 .track {
   width:100%;
   height:14px;
@@ -449,17 +488,21 @@ h1,h2,h3,h4 {
   position:relative;
   overflow:visible;
 }
+
 .fill {
   height:100%;
   border-radius:999px;
   position:relative;
 }
+
 .fill-teal{
   background: linear-gradient(90deg,#4AADA0,#6BCFC5);
 }
+
 .fill-coral{
   background: linear-gradient(90deg,#D45F50,#E08070);
 }
+
 .marker{
   position:absolute;
   top:50%;
@@ -470,6 +513,7 @@ h1,h2,h3,h4 {
   border:3px solid white;
   box-shadow:0 2px 8px rgba(0,0,0,.15);
 }
+
 .marker-teal{ background: var(--teal); }
 .marker-coral{ background: var(--coral); }
 
@@ -479,6 +523,7 @@ h1,h2,h3,h4 {
   align-items:flex-end;
   margin-top: 18px;
 }
+
 .meta-small {
   color: var(--muted);
   text-transform: uppercase;
@@ -486,46 +531,56 @@ h1,h2,h3,h4 {
   font-size: .8rem;
   font-weight:700;
 }
+
 .meta-current, .meta-goal {
   font-family:'DM Serif Display', serif;
   font-size: 3rem;
   line-height:1.1;
 }
+
 .meta-goal {
   color: var(--goal);
 }
+
 .meta-unit {
   font-family:'DM Sans', sans-serif;
   color: var(--muted);
   font-size: 1rem;
 }
+
 .meta-arrow {
   color: var(--muted);
   font-size: 1.8rem;
   padding-bottom: 10px;
 }
+
 .meta-diff {
   margin-top: 10px;
   color: var(--muted);
   font-size: 1rem;
 }
+
 .meta-diff strong{ color: var(--text); }
 
 .proj-card, .insight-card, .gauge-card, .donut-card, .history-card {
   padding: 22px;
 }
+
 .section-title {
   font-family:'DM Serif Display', serif;
   font-size: 2rem;
   margin-bottom: 16px;
 }
+
 .proj-item {
   display:flex;
   gap:12px;
   padding: 12px 0;
   border-bottom:1px solid var(--border);
 }
+
 .proj-item:last-child { border-bottom:none; }
+
 .dot {
   width: 10px;
   height: 10px;
@@ -533,21 +588,25 @@ h1,h2,h3,h4 {
   margin-top: 7px;
   flex-shrink: 0;
 }
+
 .dot-teal{background:var(--teal);}
 .dot-coral{background:var(--coral);}
 .dot-sage{background:var(--sage);}
 .dot-honey{background:var(--honey);}
+
 .proj-label {
   color: var(--muted);
   text-transform: uppercase;
   letter-spacing: .05em;
   font-size: .82rem;
 }
+
 .proj-val {
   color: var(--text);
   font-size: 1.15rem;
   margin-top: 2px;
 }
+
 .proj-val em {
   font-style: normal;
   font-weight: 700;
@@ -560,6 +619,7 @@ h1,h2,h3,h4 {
   gap: 12px;
   margin-bottom: 8px;
 }
+
 .powered {
   color: var(--muted);
   font-size: .9rem;
@@ -567,17 +627,20 @@ h1,h2,h3,h4 {
   align-items:center;
   gap:6px;
 }
+
 .ai-dot {
   width: 8px; height: 8px;
   border-radius: 50%;
   background: var(--teal);
 }
+
 .insight-body {
   color: var(--text);
   font-size: 1.1rem;
   line-height: 1.8;
   font-weight: 300;
 }
+
 .hi-green{ color:#4A9A5E; font-weight:700; }
 .hi-red{ color:#C0503F; font-weight:700; }
 .hi-gold{ color:#9A6A20; font-weight:700; }
@@ -589,15 +652,19 @@ h1,h2,h3,h4 {
   padding: 12px 0;
   border-bottom:1px solid var(--border);
 }
+
 .history-row:last-child { border-bottom:none; }
+
 .history-date {
   color: var(--muted);
   font-size: .98rem;
 }
+
 .history-peso {
   font-family:'DM Serif Display', serif;
   font-size: 1.25rem;
 }
+
 .delta-up { color: var(--coral); font-weight:700; }
 .delta-down { color: var(--sage); font-weight:700; }
 
@@ -606,6 +673,8 @@ h1,h2,h3,h4 {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 12px 14px 6px 14px;
+  margin-top: 14px;
+  margin-bottom: 14px;
 }
 
 .fake-button {
@@ -628,8 +697,9 @@ h1,h2,h3,h4 {
   .section-title { font-size: 1.6rem; }
 }
 </style>
+
 <div class="grain"></div>
-""",
+"""),
     unsafe_allow_html=True,
 )
 
@@ -638,7 +708,7 @@ h1,h2,h3,h4 {
 # HEADER
 # -----------------------------------------------------------------------------
 st.markdown(
-    f"""
+    html_block(f"""
 <div class="top-header">
     <div>
         <div class="page-title">Corpo em <em>evolução</em></div>
@@ -646,12 +716,12 @@ st.markdown(
     </div>
     <div class="date-badge">{mes_abrev}</div>
 </div>
-""",
+"""),
     unsafe_allow_html=True,
 )
 
 st.markdown(
-    f"""
+    html_block(f"""
 <div class="banner">
     <div class="banner-left">
         <div class="banner-icon">⚡</div>
@@ -659,14 +729,14 @@ st.markdown(
             <div class="banner-title">Recomposição corporal em andamento</div>
             <div class="banner-sub">
                 Meta simultânea: ganhar +{fmt_num(DATA_ATUAL["meta_peso"] - DATA_ATUAL["peso"], 1)} kg
-                e reduzir {fmt_num(DATA_ATUAL["gordura"] - DATA_ATUAL["meta_gordura"], 1)} pp de gordura.
+                e reduzir −{fmt_num(DATA_ATUAL["gordura"] - DATA_ATUAL["meta_gordura"], 1)} pp de gordura.
                 Exige ganho muscular com déficit calórico preciso.
             </div>
         </div>
     </div>
     <div class="banner-chip">Avançado</div>
 </div>
-""",
+"""),
     unsafe_allow_html=True,
 )
 
@@ -678,13 +748,13 @@ col_score, col_stats = st.columns([1.1, 4.2], gap="medium")
 
 with col_score:
     st.markdown(
-        f"""
-        <div class="score-card">
-            <div class="score-label">Score</div>
-            <div class="score-num">{DATA_ATUAL["score"]}</div>
-            <div class="score-delta">↓ {fmt_num(abs(DATA_ATUAL["delta_peso_total"]), 2)} kg</div>
-        </div>
-        """,
+        html_block(f"""
+<div class="score-card">
+    <div class="score-label">Score</div>
+    <div class="score-num">{DATA_ATUAL["score"]}</div>
+    <div class="score-delta">↓ {fmt_num(abs(DATA_ATUAL["delta_peso_total"]), 2)} kg</div>
+</div>
+"""),
         unsafe_allow_html=True,
     )
 
@@ -703,18 +773,15 @@ with col_stats:
 
     for col, nome, valor, unidade, status, klass in cards:
         with col:
-            if isinstance(valor, float):
-                valor_txt = fmt_num(valor, 1)
-            else:
-                valor_txt = str(valor)
+            valor_txt = fmt_num(valor, 1) if isinstance(valor, float) else str(valor)
             st.markdown(
-                f"""
-                <div class="metric-card {klass}">
-                    <div class="metric-name">{nome}</div>
-                    <div class="metric-value">{valor_txt}<span class="metric-unit">{unidade}</span></div>
-                    <span class="tag {status_class(status)}">{status}</span>
-                </div>
-                """,
+                html_block(f"""
+<div class="metric-card {klass}">
+    <div class="metric-name">{nome}</div>
+    <div class="metric-value">{valor_txt}<span class="metric-unit">{unidade}</span></div>
+    <span class="tag {status_class(status)}">{status}</span>
+</div>
+"""),
                 unsafe_allow_html=True,
             )
 
@@ -726,89 +793,89 @@ m1, m2 = st.columns(2, gap="medium")
 
 with m1:
     st.markdown(
-        f"""
-        <div class="meta-card">
-            <div class="meta-top">
-                <div>
-                    <div class="meta-label">Meta de peso</div>
-                    <div class="meta-title">Ganhar massa total</div>
-                </div>
-                <div class="meta-chip chip-peso">+{fmt_num(DATA_ATUAL["meta_peso"] - DATA_ATUAL["peso"], 1)} kg</div>
-            </div>
-
-            <div class="meta-progress-labels">
-                <span>Mín: <strong>{fmt_num(DATA_ATUAL["peso_min"], 0)} kg</strong></span>
-                <span>Meta: <strong>{fmt_num(DATA_ATUAL["meta_peso"], 0)} kg</strong></span>
-            </div>
-
-            <div class="track">
-                <div class="fill fill-teal" style="width:{peso_prog * 100:.1f}%">
-                    <div class="marker marker-teal"></div>
-                </div>
-            </div>
-
-            <div class="meta-nums">
-                <div>
-                    <div class="meta-small">Atual</div>
-                    <div class="meta-current">{fmt_num(DATA_ATUAL["peso"], 1)}<span class="meta-unit"> kg</span></div>
-                </div>
-                <div class="meta-arrow">→</div>
-                <div style="text-align:right">
-                    <div class="meta-small" style="color:var(--goal)">Meta</div>
-                    <div class="meta-goal">{fmt_num(DATA_ATUAL["meta_peso"], 0)}<span class="meta-unit"> kg</span></div>
-                </div>
-            </div>
-
-            <div class="meta-diff">
-                Faltam <strong>+{fmt_num(DATA_ATUAL["meta_peso"] - DATA_ATUAL["peso"], 1)} kg</strong> ·
-                {peso_prog * 100:.1f}% concluído
-            </div>
+        html_block(f"""
+<div class="meta-card">
+    <div class="meta-top">
+        <div>
+            <div class="meta-label">Meta de peso</div>
+            <div class="meta-title">Ganhar massa total</div>
         </div>
-        """,
+        <div class="meta-chip chip-peso">+{fmt_num(DATA_ATUAL["meta_peso"] - DATA_ATUAL["peso"], 1)} kg</div>
+    </div>
+
+    <div class="meta-progress-labels">
+        <span>Mín: <strong>{fmt_num(DATA_ATUAL["peso_min"], 0)} kg</strong></span>
+        <span>Meta: <strong>{fmt_num(DATA_ATUAL["meta_peso"], 0)} kg</strong></span>
+    </div>
+
+    <div class="track">
+        <div class="fill fill-teal" style="width:{peso_prog * 100:.1f}%">
+            <div class="marker marker-teal"></div>
+        </div>
+    </div>
+
+    <div class="meta-nums">
+        <div>
+            <div class="meta-small">Atual</div>
+            <div class="meta-current">{fmt_num(DATA_ATUAL["peso"], 1)}<span class="meta-unit"> kg</span></div>
+        </div>
+        <div class="meta-arrow">→</div>
+        <div style="text-align:right">
+            <div class="meta-small" style="color:var(--goal)">Meta</div>
+            <div class="meta-goal">{fmt_num(DATA_ATUAL["meta_peso"], 0)}<span class="meta-unit"> kg</span></div>
+        </div>
+    </div>
+
+    <div class="meta-diff">
+        Faltam <strong>+{fmt_num(DATA_ATUAL["meta_peso"] - DATA_ATUAL["peso"], 1)} kg</strong> ·
+        {peso_prog * 100:.1f}% concluído
+    </div>
+</div>
+"""),
         unsafe_allow_html=True,
     )
 
 with m2:
     st.markdown(
-        f"""
-        <div class="meta-card">
-            <div class="meta-top">
-                <div>
-                    <div class="meta-label">Meta de gordura</div>
-                    <div class="meta-title">Reduzir % corporal</div>
-                </div>
-                <div class="meta-chip chip-gordura">−{fmt_num(DATA_ATUAL["gordura"] - DATA_ATUAL["meta_gordura"], 1)} pp</div>
-            </div>
-
-            <div class="meta-progress-labels">
-                <span>Meta: <strong>{fmt_num(DATA_ATUAL["meta_gordura"], 0)}%</strong></span>
-                <span>Início: <strong>{fmt_num(DATA_ATUAL["gordura_inicial"], 1)}%</strong></span>
-            </div>
-
-            <div class="track">
-                <div class="fill fill-coral" style="width:{gordura_prog * 100:.1f}%">
-                    <div class="marker marker-coral"></div>
-                </div>
-            </div>
-
-            <div class="meta-nums">
-                <div>
-                    <div class="meta-small">Atual</div>
-                    <div class="meta-current">{fmt_num(DATA_ATUAL["gordura"], 1)}<span class="meta-unit"> %</span></div>
-                </div>
-                <div class="meta-arrow">→</div>
-                <div style="text-align:right">
-                    <div class="meta-small" style="color:var(--goal)">Meta</div>
-                    <div class="meta-goal">{fmt_num(DATA_ATUAL["meta_gordura"], 0)}<span class="meta-unit"> %</span></div>
-                </div>
-            </div>
-
-            <div class="meta-diff">
-                Faltam <strong>−{fmt_num(DATA_ATUAL["gordura"] - DATA_ATUAL["meta_gordura"], 1)} pp</strong> ·
-                {gordura_prog * 100:.1f}% concluído
-            </div>
+        html_block(f"""
+<div class="meta-card">
+    <div class="meta-top">
+        <div>
+            <div class="meta-label">Meta de gordura</div>
+            <div class="meta-title">Reduzir % corporal</div>
         </div>
-        """,
+        <div class="meta-chip chip-gordura">−{fmt_num(DATA_ATUAL["gordura"] - DATA_ATUAL["meta_gordura"], 1)} pp</div>
+    </div>
+
+    <div class="meta-progress-labels">
+        <span>Meta: <strong>{fmt_num(DATA_ATUAL["meta_gordura"], 0)}%</strong></span>
+        <span>Início: <strong>{fmt_num(DATA_ATUAL["gordura_inicial"], 1)}%</strong></span>
+    </div>
+
+    <div class="track">
+        <div class="fill fill-coral" style="width:{gordura_prog * 100:.1f}%">
+            <div class="marker marker-coral"></div>
+        </div>
+    </div>
+
+    <div class="meta-nums">
+        <div>
+            <div class="meta-small">Atual</div>
+            <div class="meta-current">{fmt_num(DATA_ATUAL["gordura"], 1)}<span class="meta-unit"> %</span></div>
+        </div>
+        <div class="meta-arrow">→</div>
+        <div style="text-align:right">
+            <div class="meta-small" style="color:var(--goal)">Meta</div>
+            <div class="meta-goal">{fmt_num(DATA_ATUAL["meta_gordura"], 0)}<span class="meta-unit"> %</span></div>
+        </div>
+    </div>
+
+    <div class="meta-diff">
+        Faltam <strong>−{fmt_num(DATA_ATUAL["gordura"] - DATA_ATUAL["meta_gordura"], 1)} pp</strong> ·
+        {gordura_prog * 100:.1f}% concluído
+    </div>
+</div>
+"""),
         unsafe_allow_html=True,
     )
 
@@ -821,70 +888,70 @@ p1, p2 = st.columns(2, gap="medium")
 with p1:
     semanas_txt = f"≈ {round(semanas_para_meta):,} semanas".replace(",", ".") if semanas_para_meta else "Sem projeção"
     st.markdown(
-        f"""
-        <div class="proj-card">
-            <div class="section-title">Ritmo atual & projeção</div>
+        html_block(f"""
+<div class="proj-card">
+    <div class="section-title">Ritmo atual & projeção</div>
 
-            <div class="proj-item">
-                <div class="dot dot-teal"></div>
-                <div>
-                    <div class="proj-label">Variação peso ({DATA_ATUAL["dias_periodo"]} dias)</div>
-                    <div class="proj-val">{fmt_num(DATA_ATUAL["delta_peso_total"], 1)} kg · <em>{fmt_num(ritmo_peso_sem, 2)} kg/semana</em></div>
-                </div>
-            </div>
-
-            <div class="proj-item">
-                <div class="dot dot-coral"></div>
-                <div>
-                    <div class="proj-label">Variação gordura ({DATA_ATUAL["dias_periodo"]} dias)</div>
-                    <div class="proj-val">{fmt_num(delta_gordura, 1)} pp · <em>{fmt_num(ritmo_gordura_sem, 2)} pp/semana</em></div>
-                </div>
-            </div>
-
-            <div class="proj-item">
-                <div class="dot dot-sage"></div>
-                <div>
-                    <div class="proj-label">Projeção meta 20% gordura</div>
-                    <div class="proj-val">{semanas_txt} <em>no ritmo atual</em></div>
-                </div>
-            </div>
-
-            <div class="proj-item">
-                <div class="dot dot-honey"></div>
-                <div>
-                    <div class="proj-label">Ritmo necessário p/ 1 ano</div>
-                    <div class="proj-val"><em>−{fmt_num(ritmo_necessario_1_ano, 2)} pp/semana</em> de gordura</div>
-                </div>
-            </div>
+    <div class="proj-item">
+        <div class="dot dot-teal"></div>
+        <div>
+            <div class="proj-label">Variação peso ({DATA_ATUAL["dias_periodo"]} dias)</div>
+            <div class="proj-val">{fmt_num(DATA_ATUAL["delta_peso_total"], 1)} kg · <em>{fmt_num(ritmo_peso_sem, 2)} kg/semana</em></div>
         </div>
-        """,
+    </div>
+
+    <div class="proj-item">
+        <div class="dot dot-coral"></div>
+        <div>
+            <div class="proj-label">Variação gordura ({DATA_ATUAL["dias_periodo"]} dias)</div>
+            <div class="proj-val">{fmt_num(delta_gordura, 1)} pp · <em>{fmt_num(ritmo_gordura_sem, 2)} pp/semana</em></div>
+        </div>
+    </div>
+
+    <div class="proj-item">
+        <div class="dot dot-sage"></div>
+        <div>
+            <div class="proj-label">Projeção meta 20% gordura</div>
+            <div class="proj-val">{semanas_txt} <em>no ritmo atual</em></div>
+        </div>
+    </div>
+
+    <div class="proj-item">
+        <div class="dot dot-honey"></div>
+        <div>
+            <div class="proj-label">Ritmo necessário p/ 1 ano</div>
+            <div class="proj-val"><em>−{fmt_num(ritmo_necessario_1_ano, 2)} pp/semana</em> de gordura</div>
+        </div>
+    </div>
+</div>
+"""),
         unsafe_allow_html=True,
     )
 
 with p2:
     st.markdown(
-        f"""
-        <div class="insight-card">
-            <div class="insight-head">
-                <div class="section-title" style="margin-bottom:0">Análise do período</div>
-                <div class="powered"><span class="ai-dot"></span> Claude</div>
-            </div>
+        html_block(f"""
+<div class="insight-card">
+    <div class="insight-head">
+        <div class="section-title" style="margin-bottom:0">Análise do período</div>
+        <div class="powered"><span class="ai-dot"></span> Claude</div>
+    </div>
 
-            <div class="insight-body">
-                Em {DATA_ATUAL["dias_periodo"]} dias, você perdeu
-                <span class="hi-green">{fmt_num(abs(DATA_ATUAL["delta_peso_total"]), 1)} kg</span> e reduziu gordura em
-                <span class="hi-green">{fmt_num(abs(delta_gordura), 1)} pp</span>.
-                Músculo subiu <span class="hi-green">+{fmt_num(delta_musculo, 1)} kg</span> — recomposição real acontecendo.
-                <br><br>
-                <span class="hi-red">Ritmo de gordura está lento</span>: no ritmo atual, a meta ainda está distante.
-                Para encurtar esse prazo, você precisa acelerar a queda de gordura sem perder massa magra.
-                <br><br>
-                <span class="hi-gold">Foco:</span> treino intenso, proteína alta e constância calórica.
-            </div>
+    <div class="insight-body">
+        Em {DATA_ATUAL["dias_periodo"]} dias, você perdeu
+        <span class="hi-green">{fmt_num(abs(DATA_ATUAL["delta_peso_total"]), 1)} kg</span> e reduziu gordura em
+        <span class="hi-green">{fmt_num(abs(delta_gordura), 1)} pp</span>.
+        Músculo subiu <span class="hi-green">+{fmt_num(delta_musculo, 1)} kg</span> — recomposição real acontecendo.
+        <br><br>
+        <span class="hi-red">Ritmo de gordura está lento</span>: no ritmo atual, a meta ainda está distante.
+        Para encurtar esse prazo, você precisa acelerar a queda de gordura sem perder massa magra.
+        <br><br>
+        <span class="hi-gold">Foco:</span> treino intenso, proteína alta e constância calórica.
+    </div>
 
-            <div class="fake-button">✦ Analisar agora com Claude</div>
-        </div>
-        """,
+    <div class="fake-button">✦ Analisar agora com Claude</div>
+</div>
+"""),
         unsafe_allow_html=True,
     )
 
@@ -893,6 +960,7 @@ with p2:
 # GRÁFICO DE EVOLUÇÃO
 # -----------------------------------------------------------------------------
 fig = make_subplots(specs=[[{"secondary_y": True}]])
+
 fig.add_trace(
     go.Scatter(
         x=historico["data"],
@@ -904,6 +972,7 @@ fig.add_trace(
     ),
     secondary_y=False,
 )
+
 fig.add_trace(
     go.Scatter(
         x=historico["data"],
@@ -915,6 +984,7 @@ fig.add_trace(
     ),
     secondary_y=False,
 )
+
 fig.add_trace(
     go.Scatter(
         x=historico["data"],
@@ -926,6 +996,7 @@ fig.add_trace(
     ),
     secondary_y=True,
 )
+
 fig.add_trace(
     go.Scatter(
         x=historico["data"],
@@ -937,6 +1008,7 @@ fig.add_trace(
     ),
     secondary_y=True,
 )
+
 fig.add_trace(
     go.Scatter(
         x=historico["data"],
@@ -973,6 +1045,7 @@ fig.update_xaxes(
     color="#9A9590",
     zeroline=False,
 )
+
 fig.update_yaxes(
     title_text="Peso / Músculo (kg)",
     range=[59, 98],
@@ -980,6 +1053,7 @@ fig.update_yaxes(
     gridcolor="rgba(0,0,0,0.06)",
     secondary_y=False,
 )
+
 fig.update_yaxes(
     title_text="Gordura (%)",
     range=[18, 32],
@@ -998,6 +1072,7 @@ st.markdown("</div>", unsafe_allow_html=True)
 # -----------------------------------------------------------------------------
 g1, g2 = st.columns(2, gap="medium")
 
+
 def gauge_figure(value: float, color: str, title: str):
     fig = go.Figure(
         go.Indicator(
@@ -1015,14 +1090,21 @@ def gauge_figure(value: float, color: str, title: str):
             domain={"x": [0, 1], "y": [0, 1]},
         )
     )
+
     fig.update_layout(
         height=240,
         margin=dict(l=10, r=10, t=40, b=10),
         paper_bgcolor="#FDFAF5",
         font=dict(family="DM Sans, sans-serif"),
-        title=dict(text=title, x=0.5, xanchor="center", font=dict(size=22, family="DM Serif Display")),
+        title=dict(
+            text=title,
+            x=0.5,
+            xanchor="center",
+            font=dict(size=22, family="DM Serif Display"),
+        ),
     )
     return fig
+
 
 with g1:
     st.markdown('<div class="gauge-card">', unsafe_allow_html=True)
@@ -1058,7 +1140,9 @@ b1, b2 = st.columns(2, gap="medium")
 
 with b1:
     gordura_kg = round(DATA_ATUAL["peso"] * (DATA_ATUAL["gordura"] / 100), 1)
-    outro_kg = round(DATA_ATUAL["peso"] - DATA_ATUAL["musculo"] - gordura_kg - DATA_ATUAL["massa_ossea"], 1)
+    outro_kg = round(
+        DATA_ATUAL["peso"] - DATA_ATUAL["musculo"] - gordura_kg - DATA_ATUAL["massa_ossea"], 1
+    )
 
     donut = go.Figure(
         data=[
@@ -1066,14 +1150,23 @@ with b1:
                 labels=["Músculo", "Gordura", "Osso", "Outro"],
                 values=[DATA_ATUAL["musculo"], gordura_kg, DATA_ATUAL["massa_ossea"], outro_kg],
                 hole=0.68,
-                marker=dict(colors=["#5FA04E", "#D45F50", "#C4A882", "#4AADA0"], line=dict(color="#FDFAF5", width=4)),
+                marker=dict(
+                    colors=["#5FA04E", "#D45F50", "#C4A882", "#4AADA0"],
+                    line=dict(color="#FDFAF5", width=4),
+                ),
                 textinfo="none",
                 sort=False,
             )
         ]
     )
+
     donut.update_layout(
-        title=dict(text="Composição hoje", x=0.02, xanchor="left", font=dict(size=24, family="DM Serif Display")),
+        title=dict(
+            text="Composição hoje",
+            x=0.02,
+            xanchor="left",
+            font=dict(size=24, family="DM Serif Display"),
+        ),
         height=360,
         margin=dict(l=10, r=10, t=60, b=10),
         paper_bgcolor="#FDFAF5",
@@ -1088,6 +1181,7 @@ with b1:
         font=dict(family="DM Sans, sans-serif"),
         legend=dict(orientation="h", y=-0.05),
     )
+
     st.markdown('<div class="donut-card">', unsafe_allow_html=True)
     st.plotly_chart(donut, use_container_width=True, config={"displayModeBar": False})
     st.markdown("</div>", unsafe_allow_html=True)
@@ -1097,30 +1191,31 @@ with b2:
     for dt, peso, delta, kind in historico_lista:
         klass = "delta-up" if kind == "up" else "delta-down"
         rows_html += f"""
-        <div class="history-row">
-            <span class="history-date">{dt}</span>
-            <span class="history-peso">{peso}</span>
-            <span class="{klass}">{delta}</span>
-        </div>
-        """
+<div class="history-row">
+    <span class="history-date">{dt}</span>
+    <span class="history-peso">{peso}</span>
+    <span class="{klass}">{delta}</span>
+</div>
+"""
 
     st.markdown(
-        f"""
-        <div class="history-card">
-            <div class="section-title" style="font-size:1.8rem">Histórico</div>
-            {rows_html}
-        </div>
-        """,
+        html_block(f"""
+<div class="history-card">
+    <div class="section-title" style="font-size:1.8rem">Histórico</div>
+    {rows_html}
+</div>
+"""),
         unsafe_allow_html=True,
     )
 
 
 # -----------------------------------------------------------------------------
-# EXTRA OPCIONAL: UPLOAD
+# UPLOAD OPCIONAL
 # -----------------------------------------------------------------------------
 st.markdown("<br>", unsafe_allow_html=True)
+
 st.markdown(
-    """
+    html_block("""
 <div style="
 background:#FDFAF5;
 border:2px dashed #E8E3D8;
@@ -1130,11 +1225,19 @@ text-align:center;
 margin-top:4px;
 ">
     <div style="font-size:2rem">📸</div>
-    <div style="font-family:'DM Serif Display', serif;font-size:1.6rem;color:#2C2A26;margin-top:4px">Novo upload Zepp Life</div>
-    <div style="color:#9A9590;font-size:1rem;margin-top:6px">Toque abaixo para enviar uma nova imagem/print da medição</div>
+    <div style="font-family:'DM Serif Display', serif;font-size:1.6rem;color:#2C2A26;margin-top:4px">
+        Novo upload Zepp Life
+    </div>
+    <div style="color:#9A9590;font-size:1rem;margin-top:6px">
+        Toque abaixo para enviar uma nova imagem/print da medição
+    </div>
 </div>
-""",
+"""),
     unsafe_allow_html=True,
 )
 
-st.file_uploader("Enviar nova medição", type=["png", "jpg", "jpeg"], label_visibility="collapsed")
+st.file_uploader(
+    "Enviar nova medição",
+    type=["png", "jpg", "jpeg"],
+    label_visibility="collapsed",
+)
