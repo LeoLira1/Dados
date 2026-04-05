@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# SQLite database
+data/
+*.db
+*.sqlite3
+
+# Streamlit secrets
+.streamlit/secrets.toml
+
+# Environment variables
+.env
+
+# OS
+.DS_Store
